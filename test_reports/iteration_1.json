@@ -1,0 +1,39 @@
+{
+  "summary": "Full backend + frontend end-to-end testing of OpenJATS Editor. 27/27 backend pytest pass (including live Crossref + ORCID lookups). Frontend e2e Playwright run covered dashboard, filters, theme toggle, article create→editor navigation, metadata fill+save (autosave indicator transitions to 'Saved HH:MM:SS'), authors with fullname auto-fill, ORCID lookup auto-fill (Josiah Carberry), IMRAD 11-section editor with toolbar insertions, references manager (add, Crossref DOI lookup filled real Nature paper title, RIS import grew refs from 1→2), JATS/PKP/Crossref XML tabs, PDF preview, validation panel (3 warnings shown), export menu (all 5 items), templates CRUD. No blocking issues.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "IMRADEditor toolbar", "issue": "tool-heading (and likely tool-subheading) inserts raw markdown tokens like '##' that are not parsed when rendered in PDF Preview, so the PDF shows the literal '##' characters (e.g., 'This is the introduction text.##'). Either parse markdown when rendering PDF preview, or use JATS/HTML semantic tags instead of markdown-style insertions.", "selector": "[data-testid=tool-heading]", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Dashboard", "issues": ["Filter inputs (Volume/Issue/Year/Search) use placeholder text only — no visible labels above the inputs, could hurt accessibility. Otherwise contrast/spacing look good."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_openjats_api.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "[Optional/Medium] Decide on a markup convention for the IMRAD toolbar. Currently tool-heading inserts '## ' (markdown) which then leaks unrendered into the PDF preview. Either (a) render markdown in PDFPreview, or (b) insert HTML/JATS tags (e.g., <sec><title>…</title></sec>) and render accordingly."
+  ],
+  "critical_code_review_comments": [
+    "models.py / server.py: MongoDB _id correctly excluded via projection {'_id': 0} everywhere — good.",
+    "server.py: Uses os.environ['MONGO_URL'] and os.environ['DB_NAME'] (no defaults) — good fail-fast.",
+    "server.py: External Crossref/ORCID lookups are blocking (`requests` library) inside async endpoints; under load they will block the event loop. Consider moving to httpx.AsyncClient or run_in_threadpool for production. Not a functional bug; works fine for single-editor mode.",
+    "server.py: PUT /articles/{id} fully replaces the document — no protection against client overwriting fields that might have been updated by autosave. Acceptable for single-editor mode but worth documenting.",
+    "Frontend uses REACT_APP_BACKEND_URL correctly. data-testid coverage is excellent across all components.",
+    "validators.py / jats_generator.py / docx_generator.py work as advertised based on endpoint outputs."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_openjats_api.py",
+    "/app/backend/tests/__init__.py"
+  ],
+  "success_rate": {"backend": "100% (27/27)", "frontend": "~95% (all data-testids resolved, all primary flows successful; one rendering nit on toolbar markdown leaking into PDF)"},
+  "test_credentials": "None — single-editor mode, no auth (confirmed in /app/memory/test_credentials.md).",
+  "seed_data_creation": "Tests create their own ephemeral 'TEST_*' prefixed articles and templates and clean them up. A few 'Untitled Article' rows from prior runs remain on the dashboard.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend test file at /app/backend/tests/test_openjats_api.py is a complete regression suite (articles CRUD, validation, JATS/PKP/Crossref/DOCX, references import/export/format, templates CRUD, external lookups). External Crossref/ORCID worked in this environment — test_lookup_crossref/orcid use pytest.skip() on 502/504. Frontend Playwright run covered the full happy path; only outstanding observation is the IMRAD toolbar inserts raw '##' which is not parsed by PDFPreview.",
+  "rca of the issue": "IMRAD toolbar 'tool-heading' inserts the literal string '## ' (or similar markdown) into the textarea-introduction; PDFPreview renders the section bodies verbatim without a markdown parser, so the '##' tokens leak into the final layout. Fix: either replace toolbar inserters with semantic markup that PDFPreview already understands, or wire react-markdown / remark into PDFPreview for the section bodies. Reproduction: Editor → IMRAD → Introduction → type text → click 'Heading' tool → switch to PDF Preview → see '##' rendered literally."
+}

@@ -1,0 +1,123 @@
+"""Pydantic models for OpenJATS Editor."""
+from __future__ import annotations
+from datetime import datetime, timezone
+from typing import List, Optional, Literal
+import uuid
+from pydantic import BaseModel, Field, ConfigDict
+
+
+def _new_id() -> str:
+    return str(uuid.uuid4())
+
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+class Journal(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    title: str = ""
+    issn: str = ""
+    eissn: str = ""
+    publisher: str = ""
+    volume: str = ""
+    issue: str = ""
+    year: str = ""
+    doi_prefix: str = ""
+
+
+class Author(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=_new_id)
+    given_name: str = ""
+    family_name: str = ""
+    full_name: str = ""
+    orcid: str = ""
+    email: str = ""
+    affiliation: str = ""
+    department: str = ""
+    institution: str = ""
+    country: str = ""
+    corresponding: bool = False
+
+
+class Abstract(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    english: str = ""
+    indonesian: str = ""
+    keywords: List[str] = Field(default_factory=list)
+
+
+class Sections(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    introduction: str = ""
+    methods: str = ""
+    results: str = ""
+    discussion: str = ""
+    conclusion: str = ""
+    acknowledgement: str = ""
+    funding: str = ""
+    conflict_of_interest: str = ""
+    data_availability: str = ""
+    author_contributions: str = ""
+    ethical_approval: str = ""
+
+
+class Reference(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=_new_id)
+    type: str = "journal"  # journal, book, chapter, web
+    authors: List[str] = Field(default_factory=list)  # "Family, G." strings
+    title: str = ""
+    journal: str = ""
+    year: str = ""
+    volume: str = ""
+    issue: str = ""
+    pages: str = ""
+    doi: str = ""
+    url: str = ""
+    publisher: str = ""
+    raw: str = ""
+
+
+class Article(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=_new_id)
+    title: str = ""
+    running_title: str = ""
+    subtitle: str = ""
+    doi: str = ""
+    keywords: List[str] = Field(default_factory=list)
+    language: str = "en"
+    article_type: str = "research-article"
+    status: Literal["draft", "review", "layout", "published"] = "draft"
+    journal: Journal = Field(default_factory=Journal)
+    authors: List[Author] = Field(default_factory=list)
+    abstract: Abstract = Field(default_factory=Abstract)
+    sections: Sections = Field(default_factory=Sections)
+    references: List[Reference] = Field(default_factory=list)
+    created_at: str = Field(default_factory=_now_iso)
+    updated_at: str = Field(default_factory=_now_iso)
+
+
+class ArticleSummary(BaseModel):
+    id: str
+    title: str
+    status: str
+    authors: List[str] = Field(default_factory=list)
+    journal_title: str = ""
+    volume: str = ""
+    issue: str = ""
+    year: str = ""
+    updated_at: str = ""
+
+
+class Template(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=_new_id)
+    name: str = ""
+    journal: Journal = Field(default_factory=Journal)
+    copyright_statement: str = ""
+    license: str = "CC-BY 4.0"
+    publisher_info: str = ""
+    created_at: str = Field(default_factory=_now_iso)
