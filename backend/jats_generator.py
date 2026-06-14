@@ -124,6 +124,26 @@ def generate_jats(article: Article) -> str:
     if article.keywords or article.abstract.keywords:
         kwd_group = f"""      <kwd-group kwd-group-type="author">{abstract_kw}</kwd-group>"""
 
+    # build history block (received/revised/accepted)
+    def _date_xml(label: str, iso: str) -> str:
+        if not iso:
+            return ""
+        parts = iso.split("-")
+        if len(parts) < 3:
+            return ""
+        y, m, d = parts[0], parts[1], parts[2]
+        return f"""        <date date-type="{label}"><day>{d}</day><month>{m}</month><year>{y}</year></date>"""
+
+    history_dates = [
+        _date_xml("received", article.received_date),
+        _date_xml("rev-recd", article.revised_date),
+        _date_xml("accepted", article.accepted_date),
+    ]
+    history_dates = [d for d in history_dates if d]
+    history_block = ""
+    if history_dates:
+        history_block = "      <history>\n" + "\n".join(history_dates) + "\n      </history>"
+
     abstract_id_block = ""
     if article.abstract.indonesian:
         abstract_id_block = f"""      <trans-abstract xml:lang="id"><p>{_esc(article.abstract.indonesian)}</p></trans-abstract>"""
@@ -164,6 +184,7 @@ def generate_jats(article: Article) -> str:
       </pub-date>
       <volume>{_esc(j.volume)}</volume>
       <issue>{_esc(j.issue)}</issue>
+{history_block}
       <abstract>
         <p>{_esc(article.abstract.english)}</p>
       </abstract>

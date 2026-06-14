@@ -77,6 +77,20 @@ def generate_docx(article: Article, citation_style: str = "apa") -> bytes:
         kr.bold = True
         kp.add_run(", ".join(article.keywords))
 
+    # History dates
+    history_bits = []
+    if article.received_date:
+        history_bits.append(f"Received: {article.received_date}")
+    if article.revised_date:
+        history_bits.append(f"Revised: {article.revised_date}")
+    if article.accepted_date:
+        history_bits.append(f"Accepted: {article.accepted_date}")
+    if history_bits:
+        hp = doc.add_paragraph()
+        hr = hp.add_run(" · ".join(history_bits))
+        hr.italic = True
+        hr.font.size = Pt(9)
+
     # Indonesian abstract
     if article.abstract.indonesian:
         _h(doc, "Abstrak", size=12)

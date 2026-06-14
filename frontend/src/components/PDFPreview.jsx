@@ -124,6 +124,13 @@ export function PDFPreview({ article, formattedRefs = [] }) {
                   <strong>Keywords:</strong> {article.keywords.join(", ")}
                 </div>
               )}
+              {(article.received_date || article.revised_date || article.accepted_date) && (
+                <div className="mt-2 text-xs text-zinc-600 font-sans" data-testid="pdf-history-dates">
+                  {article.received_date && <span><strong>Received:</strong> {article.received_date} </span>}
+                  {article.revised_date && <span> · <strong>Revised:</strong> {article.revised_date} </span>}
+                  {article.accepted_date && <span> · <strong>Accepted:</strong> {article.accepted_date}</span>}
+                </div>
+              )}
             </div>
           )}
 

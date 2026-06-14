@@ -120,6 +120,33 @@ export function MetadataForm({ article, onChange, templates, onApplyTemplate }) 
             data-testid="input-keywords"
           />
         </Field>
+        <Field label="Received" testId="field-received-date">
+          <input
+            type="date"
+            value={article.received_date || ""}
+            onChange={(e) => set("received_date", e.target.value)}
+            className={inputCls}
+            data-testid="input-received-date"
+          />
+        </Field>
+        <Field label="Revised" testId="field-revised-date">
+          <input
+            type="date"
+            value={article.revised_date || ""}
+            onChange={(e) => set("revised_date", e.target.value)}
+            className={inputCls}
+            data-testid="input-revised-date"
+          />
+        </Field>
+        <Field label="Accepted" testId="field-accepted-date">
+          <input
+            type="date"
+            value={article.accepted_date || ""}
+            onChange={(e) => set("accepted_date", e.target.value)}
+            className={inputCls}
+            data-testid="input-accepted-date"
+          />
+        </Field>
       </Section>
 
       <AuthorsManager

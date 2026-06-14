@@ -91,6 +91,9 @@ class Article(BaseModel):
     language: str = "en"
     article_type: str = "research-article"
     status: Literal["draft", "review", "layout", "published"] = "draft"
+    received_date: str = ""
+    revised_date: str = ""
+    accepted_date: str = ""
     journal: Journal = Field(default_factory=Journal)
     authors: List[Author] = Field(default_factory=list)
     abstract: Abstract = Field(default_factory=Abstract)
