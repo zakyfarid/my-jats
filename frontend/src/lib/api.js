@@ -26,6 +26,8 @@ export const api = {
 
   importReferences: (format, content) =>
     client.post("/references/import", { format, content }).then((r) => r.data),
+  parseReferencesText: (text) =>
+    client.post("/references/parse-text", { text }).then((r) => r.data),
   exportReferences: (format, references) =>
     client.post("/references/export", { format, references }, { responseType: "blob" }).then((r) => r.data),
   formatReferences: (references, style) =>

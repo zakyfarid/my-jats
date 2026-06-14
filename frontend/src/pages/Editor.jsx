@@ -266,6 +266,8 @@ export default function Editor() {
             <IMRADEditor
               sections={article.sections || {}}
               onChange={(sections) => onChange({ ...article, sections })}
+              figures={article.figures || []}
+              onFiguresChange={(figures) => onChange({ ...article, figures })}
             />
           )}
           {tab === "references" && (

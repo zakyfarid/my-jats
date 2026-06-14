@@ -1,7 +1,8 @@
 import React from "react";
-import { Plus, Trash2, Search, Upload, Download, FileDown } from "lucide-react";
+import { Plus, Trash2, Search, Upload, FileDown, Sparkles } from "lucide-react";
 import { api } from "../lib/api";
 import { toast } from "sonner";
+import { PasteReferencesModal } from "./PasteReferencesModal";
 
 export function ReferencesManager({ references, onChange }) {
   const [style, setStyle] = React.useState("apa");
@@ -9,6 +10,7 @@ export function ReferencesManager({ references, onChange }) {
   const [importOpen, setImportOpen] = React.useState(false);
   const [importFormat, setImportFormat] = React.useState("ris");
   const [importText, setImportText] = React.useState("");
+  const [pasteOpen, setPasteOpen] = React.useState(false);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -92,6 +94,9 @@ export function ReferencesManager({ references, onChange }) {
           </select>
         </div>
         <div className="flex items-center gap-1">
+          <button onClick={() => setPasteOpen(true)} data-testid="paste-refs-btn" className="text-xs flex items-center gap-1 px-2 py-1 border border-primary/40 text-primary rounded-sm hover:bg-primary/10">
+            <Sparkles className="h-3 w-3" /> Paste &amp; Parse
+          </button>
           <button onClick={() => setImportOpen(true)} data-testid="import-refs-btn" className="text-xs flex items-center gap-1 px-2 py-1 border border-border rounded-sm hover:bg-secondary">
             <Upload className="h-3 w-3" /> Import
           </button>
@@ -205,6 +210,12 @@ export function ReferencesManager({ references, onChange }) {
           ))}
         </ol>
       )}
+
+      <PasteReferencesModal
+        open={pasteOpen}
+        onClose={() => setPasteOpen(false)}
+        onAppend={(parsed) => onChange([...(references || []), ...parsed])}
+      />
     </div>
   );
 }

@@ -82,6 +82,15 @@ class Reference(BaseModel):
     raw: str = ""
 
 
+class Figure(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=_new_id)
+    label: str = ""  # e.g. "Figure 1"
+    caption: str = ""
+    data_url: str = ""  # base64 encoded image
+    width: str = "full"  # full | half | third
+
+
 class Article(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=_new_id)
@@ -101,6 +110,7 @@ class Article(BaseModel):
     abstract: Abstract = Field(default_factory=Abstract)
     sections: Sections = Field(default_factory=Sections)
     references: List[Reference] = Field(default_factory=list)
+    figures: List[Figure] = Field(default_factory=list)
     created_at: str = Field(default_factory=_now_iso)
     updated_at: str = Field(default_factory=_now_iso)
 

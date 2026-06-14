@@ -115,11 +115,74 @@ code, pre, .font-mono {
 .pdf-preview .pdf-title { font-family: "IBM Plex Sans"; font-weight: 700; }
 .pdf-preview .pdf-body {
   text-align: justify;
-  hyphens: auto;
+  hyphens: none;
+  word-break: normal;
+  overflow-wrap: break-word;
 }
 .pdf-preview .pdf-abstract {
   text-align: justify;
-  hyphens: auto;
+  hyphens: none;
+  word-break: normal;
+  overflow-wrap: break-word;
+}
+.pdf-preview table.pdf-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+  font-size: 0.85rem;
+}
+.pdf-preview table.pdf-table th,
+.pdf-preview table.pdf-table td {
+  border: 1px solid #475569;
+  padding: 6px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+.pdf-preview table.pdf-table th {
+  background: #e2e8f0;
+  font-weight: 600;
+}
+.pdf-preview .pdf-table-caption {
+  font-family: "IBM Plex Sans", sans-serif;
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+.pdf-preview .pdf-figure {
+  margin: 1.25rem 0;
+  text-align: center;
+}
+.pdf-preview .pdf-figure img {
+  max-width: 100%;
+  height: auto;
+  border: 1px solid #e2e8f0;
+}
+.pdf-preview .pdf-figure-caption {
+  font-family: "IBM Plex Sans", sans-serif;
+  font-size: 0.75rem;
+  color: #475569;
+  margin-top: 0.5rem;
+  font-style: italic;
+}
+.pdf-preview .pdf-page-break {
+  border-top: 1px dashed #94a3b8;
+  margin: 2rem 0;
+  text-align: center;
+  font-size: 0.65rem;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  padding-top: 0.25rem;
+}
+@media print {
+  .pdf-preview .pdf-page-break {
+    page-break-before: always;
+    border: none;
+    margin: 0;
+    padding: 0;
+    height: 0;
+    color: transparent;
+  }
 }
 
 /* Editor textarea uniform style */

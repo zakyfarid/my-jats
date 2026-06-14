@@ -15,6 +15,7 @@ from models import Article, ArticleSummary, Template, Reference
 from jats_generator import generate_jats, generate_pkp_native, generate_crossref
 from validators import validate_article
 from reference_parsers import parse_ris, parse_bibtex, parse_endnote, to_ris, to_bibtex
+from reference_text_parser import parse_references_text
 from citation_formatter import format_references
 from external_lookup import lookup_crossref, lookup_orcid
 from docx_generator import generate_docx
@@ -202,8 +203,19 @@ async def import_references(payload: dict = Body(...)):
         refs = parse_bibtex(text)
     elif fmt == "endnote":
         refs = parse_endnote(text)
+    elif fmt == "text":
+        refs = parse_references_text(text)
     else:
-        raise HTTPException(status_code=400, detail="Unknown format. Use 'ris', 'bibtex', or 'endnote'.")
+        raise HTTPException(status_code=400, detail="Unknown format. Use 'ris', 'bibtex', 'endnote', or 'text'.")
+    return {"references": [r.model_dump() for r in refs], "count": len(refs)}
+
+
+@api_router.post("/references/parse-text")
+async def parse_references_endpoint(payload: dict = Body(...)):
+    text = payload.get("text") or payload.get("content") or ""
+    if not text.strip():
+        raise HTTPException(status_code=400, detail="Empty text")
+    refs = parse_references_text(text)
     return {"references": [r.model_dump() for r in refs], "count": len(refs)}
 
 
