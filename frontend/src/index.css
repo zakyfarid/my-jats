@@ -189,7 +189,13 @@ code, pre, .font-mono {
 @media print {
   @page {
     size: A4;
-    margin: 0;
+    margin: 2.5cm 2.2cm 2.5cm 2.2cm;
+    @bottom-center {
+      content: counter(page) " / " counter(pages);
+      font-family: "IBM Plex Sans", sans-serif;
+      font-size: 9pt;
+      color: #475569;
+    }
   }
   html, body {
     background: #ffffff !important;
@@ -210,7 +216,7 @@ code, pre, .font-mono {
     width: 100% !important;
     max-width: 100% !important;
     margin: 0 !important;
-    padding: 1.5cm 2cm !important;
+    padding: 0 !important;
     box-shadow: none !important;
     border-radius: 0 !important;
     background: #ffffff !important;
@@ -221,8 +227,20 @@ code, pre, .font-mono {
   .pdf-preview h1, .pdf-preview h2, .pdf-preview h3, .pdf-preview h4 {
     page-break-after: avoid;
   }
-  /* Hide print/toolbar control buttons and sidebars */
+  /* page number reset for first article only */
   [data-no-print="true"] { display: none !important; }
+}
+
+/* On-screen title justified across multi-line breaks */
+.pdf-preview .pdf-title {
+  text-align: justify;
+  text-justify: inter-word;
+}
+/* Last line of justified title stays left for readability */
+.pdf-preview .pdf-title::after {
+  content: "";
+  display: inline-block;
+  width: 100%;
 }
 
 /* Editor textarea uniform style */

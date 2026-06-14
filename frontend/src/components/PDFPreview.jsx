@@ -189,7 +189,7 @@ function renderBlocks(body, figuresMap, keyPrefix = "") {
   return blocks;
 }
 
-export function PDFPreview({ article, formattedRefs = [] }) {
+export function PDFPreview({ article, formattedRefs = [], issueInfo }) {
   const j = article.journal || {};
   const handlePrint = () => window.print();
   const figuresMap = React.useMemo(() => {
@@ -211,7 +211,7 @@ export function PDFPreview({ article, formattedRefs = [] }) {
         </button>
       </div>
       <div className="flex-1 overflow-auto p-8 bg-zinc-800">
-        <div className="pdf-preview mx-auto max-w-4xl shadow-xl rounded-sm p-12" data-testid="pdf-content">
+        <div className="pdf-preview mx-auto max-w-4xl shadow-xl rounded-sm" style={{ padding: "3.5rem 3rem" }} data-testid="pdf-content">
           {/* Custom Journal Header with Logo */}
           {(j.logo || j.custom_header || j.title) && (
             <div className="border-b-2 border-zinc-700 pb-4 mb-6 flex items-center gap-4" data-testid="pdf-custom-header">
@@ -239,10 +239,13 @@ export function PDFPreview({ article, formattedRefs = [] }) {
             </div>
           )}
 
-          {/* Volume / DOI strip */}
+          {/* Volume / Article number / DOI strip */}
           <div className="border-b border-zinc-300 pb-3 mb-6 text-xs flex justify-between text-zinc-600">
             <span>
               Vol. {j.volume || "—"}, No. {j.issue || "—"} ({j.year || "—"})
+              {issueInfo && issueInfo.total_in_issue > 0 && (
+                <span data-testid="pdf-article-number"> · Article {issueInfo.article_number} of {issueInfo.total_in_issue}</span>
+              )}
             </span>
             <span>doi: {article.doi || "—"}</span>
           </div>

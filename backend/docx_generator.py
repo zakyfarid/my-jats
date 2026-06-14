@@ -14,8 +14,8 @@ from citation_formatter import format_references
 
 def _set_margins(doc: Document):
     for section in doc.sections:
-        section.top_margin = Cm(2.0)
-        section.bottom_margin = Cm(2.0)
+        section.top_margin = Cm(2.5)
+        section.bottom_margin = Cm(2.5)
         section.left_margin = Cm(2.5)
         section.right_margin = Cm(2.5)
 

@@ -35,6 +35,7 @@ export default function Editor() {
   const [templates, setTemplates] = useState([]);
   const [formattedRefs, setFormattedRefs] = useState([]);
   const [exportOpen, setExportOpen] = useState(false);
+  const [issueInfo, setIssueInfo] = useState(null);
 
   const articleRef = useRef(null);
   const validationTimer = useRef(null);
@@ -42,11 +43,12 @@ export default function Editor() {
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([api.getArticle(id), api.listTemplates()])
-      .then(([art, tpls]) => {
+    Promise.all([api.getArticle(id), api.listTemplates(), api.getIssueInfo(id).catch(() => null)])
+      .then(([art, tpls, info]) => {
         if (cancelled) return;
         setArticle(art);
         setTemplates(tpls);
+        setIssueInfo(info);
         setLoading(false);
       })
       .catch(() => {
@@ -135,6 +137,7 @@ export default function Editor() {
     }
     if (newTab === "pdf" && article) {
       api.formatReferences(article.references || [], "apa").then((d) => setFormattedRefs(d.formatted)).catch(() => {});
+      api.getIssueInfo(id).then(setIssueInfo).catch(() => setIssueInfo(null));
     }
   };
 
@@ -288,7 +291,7 @@ export default function Editor() {
             <XMLPreview xml={xml.crossref} kind="Crossref" articleId={id} downloadUrl={downloadXMLLink("crossref")} />
           )}
           {tab === "pdf" && (
-            <PDFPreview article={article} formattedRefs={formattedRefs} />
+            <PDFPreview article={article} formattedRefs={formattedRefs} issueInfo={issueInfo} />
           )}
         </div>
 

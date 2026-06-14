@@ -118,6 +118,33 @@ async def delete_article(article_id: str):
     return {"deleted": True}
 
 
+@api_router.get("/articles/{article_id}/issue-info")
+async def article_issue_info(article_id: str):
+    doc = await db.articles.find_one({"id": article_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Article not found")
+    j = doc.get("journal", {}) or {}
+    query = {
+        "journal.volume": j.get("volume", ""),
+        "journal.issue": j.get("issue", ""),
+        "journal.year": j.get("year", ""),
+    }
+    siblings = await db.articles.find(query, {"_id": 0, "id": 1, "title": 1, "created_at": 1}).sort("created_at", 1).to_list(1000)
+    article_number = 1
+    for idx, s in enumerate(siblings, start=1):
+        if s["id"] == article_id:
+            article_number = idx
+            break
+    return {
+        "article_number": article_number,
+        "total_in_issue": len(siblings),
+        "siblings": [{"id": s["id"], "title": s.get("title", ""), "number": i + 1} for i, s in enumerate(siblings)],
+        "volume": j.get("volume", ""),
+        "issue": j.get("issue", ""),
+        "year": j.get("year", ""),
+    }
+
+
 # ---------- Validation ----------
 @api_router.post("/articles/{article_id}/validate")
 async def validate(article_id: str):

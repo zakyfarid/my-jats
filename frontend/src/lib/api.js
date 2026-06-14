@@ -11,6 +11,7 @@ const client = axios.create({
 export const api = {
   listArticles: (params = {}) => client.get("/articles", { params }).then((r) => r.data),
   getArticle: (id) => client.get(`/articles/${id}`).then((r) => r.data),
+  getIssueInfo: (id) => client.get(`/articles/${id}/issue-info`).then((r) => r.data),
   createArticle: (data) => client.post("/articles", data).then((r) => r.data),
   updateArticle: (id, data) => client.put(`/articles/${id}`, data).then((r) => r.data),
   deleteArticle: (id) => client.delete(`/articles/${id}`).then((r) => r.data),
