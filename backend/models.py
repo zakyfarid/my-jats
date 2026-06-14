@@ -106,6 +106,8 @@ class Article(BaseModel):
     revised_date: str = ""
     accepted_date: str = ""
     citation_style: str = "apa"  # apa | harvard | vancouver
+    license: str = "CC-BY 4.0"  # creative commons license
+    font_family: str = "Merriweather"  # body font for PDF/DOCX
     journal: Journal = Field(default_factory=Journal)
     authors: List[Author] = Field(default_factory=list)
     abstract: Abstract = Field(default_factory=Abstract)

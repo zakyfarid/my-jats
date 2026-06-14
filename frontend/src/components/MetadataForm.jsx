@@ -166,6 +166,31 @@ export function MetadataForm({ article, onChange, templates, onApplyTemplate }) 
             <option value="published">Published</option>
           </select>
         </Field>
+        <Field label="License (Creative Commons)" testId="field-license">
+          <select value={article.license || "CC-BY 4.0"} onChange={(e) => set("license", e.target.value)} className={inputCls} data-testid="input-license">
+            <option value="CC-BY 4.0">CC BY 4.0 — Attribution</option>
+            <option value="CC-BY-SA 4.0">CC BY-SA 4.0 — Attribution-ShareAlike</option>
+            <option value="CC-BY-NC 4.0">CC BY-NC 4.0 — Attribution-NonCommercial</option>
+            <option value="CC-BY-NC-SA 4.0">CC BY-NC-SA 4.0 — Attribution-NonCommercial-ShareAlike</option>
+            <option value="CC-BY-ND 4.0">CC BY-ND 4.0 — Attribution-NoDerivatives</option>
+            <option value="CC0">CC0 1.0 — Public Domain</option>
+            <option value="All rights reserved">All rights reserved</option>
+          </select>
+        </Field>
+        <Field label="Font Family (body)" testId="field-font-family">
+          <select value={article.font_family || "Merriweather"} onChange={(e) => set("font_family", e.target.value)} className={inputCls} data-testid="input-font-family">
+            <option value="Merriweather">Merriweather (Serif, default)</option>
+            <option value="Times New Roman">Times New Roman</option>
+            <option value="Georgia">Georgia</option>
+            <option value="Cambria">Cambria</option>
+            <option value="Garamond">Garamond</option>
+            <option value="Calibri">Calibri (Sans)</option>
+            <option value="Arial">Arial (Sans)</option>
+            <option value="Helvetica">Helvetica</option>
+            <option value="IBM Plex Sans">IBM Plex Sans</option>
+            <option value="JetBrains Mono">JetBrains Mono (Monospace)</option>
+          </select>
+        </Field>
         <Field label="Keywords (comma separated)" colSpan={2} testId="field-keywords">
           <input
             value={(article.keywords || []).join(", ")}

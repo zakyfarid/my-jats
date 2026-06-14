@@ -1,5 +1,5 @@
 import React from "react";
-import { Heading1, Heading2, Table as TableIcon, Image, Sigma, AsteriskSquare, Quote, FileVolume } from "lucide-react";
+import { Heading1, Heading2, Table as TableIcon, Image, Sigma, AsteriskSquare, Quote, FileVolume, Bold, Italic, Underline, List, ListOrdered } from "lucide-react";
 import { TableBuilderModal } from "./TableBuilderModal";
 import { FigureInsertModal } from "./FigureInsertModal";
 
@@ -39,11 +39,37 @@ export function IMRADEditor({ sections, onChange, figures = [], onFiguresChange 
     }, 0);
   };
 
+  const wrapSelection = (left, right = left) => {
+    const ta = textareaRefs.current[active];
+    if (!ta) return;
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    const cur = sections[active] || "";
+    const selected = cur.slice(start, end) || "text";
+    const next = cur.slice(0, start) + left + selected + right + cur.slice(end);
+    set(active, next);
+    setTimeout(() => {
+      ta.focus();
+      ta.setSelectionRange(start + left.length, start + left.length + selected.length);
+    }, 0);
+  };
+
+  const insertList = (ordered) => {
+    const prefix = ordered ? "1. " : "- ";
+    const text = `\n${prefix}First item\n${ordered ? "2. " : "- "}Second item\n${ordered ? "3. " : "- "}Third item\n`;
+    insertAtCursor(text);
+  };
+
   const TOOLS = [
     { onClick: () => insertAtCursor("## "), icon: Heading1, label: "Heading", testId: "tool-heading" },
     { onClick: () => insertAtCursor("### "), icon: Heading2, label: "Subheading", testId: "tool-subheading" },
-    { onClick: () => setTableOpen(true), icon: TableIcon, label: "Insert Table…", testId: "tool-table" },
-    { onClick: () => setFigureOpen(true), icon: Image, label: "Insert Figure…", testId: "tool-figure" },
+    { onClick: () => wrapSelection("**"), icon: Bold, label: "Bold", testId: "tool-bold" },
+    { onClick: () => wrapSelection("*"), icon: Italic, label: "Italic", testId: "tool-italic" },
+    { onClick: () => wrapSelection("_"), icon: Underline, label: "Underline", testId: "tool-underline" },
+    { onClick: () => insertList(true), icon: ListOrdered, label: "Numbered", testId: "tool-numbered" },
+    { onClick: () => insertList(false), icon: List, label: "Bullets", testId: "tool-bullets" },
+    { onClick: () => setTableOpen(true), icon: TableIcon, label: "Table…", testId: "tool-table" },
+    { onClick: () => setFigureOpen(true), icon: Image, label: "Figure…", testId: "tool-figure" },
     { onClick: () => insertAtCursor("$$ E = mc^2 $$"), icon: Sigma, label: "Formula", testId: "tool-formula" },
     { onClick: () => insertAtCursor("[^footnote: ]"), icon: AsteriskSquare, label: "Footnote", testId: "tool-footnote" },
     { onClick: () => insertAtCursor("[@cite-key]"), icon: Quote, label: "Citation", testId: "tool-citation" },

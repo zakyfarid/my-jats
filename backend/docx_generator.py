@@ -242,16 +242,83 @@ def _heading(doc: Document, text: str, level: int = 1):
     return p
 
 
-def _add_body_para(doc: Document, text: str, style: str = "OpenJATS Body", indent: bool = True):
-    p = doc.add_paragraph(text, style=style)
+def _add_body_para(doc: Document, text: str, style: str = "OpenJATS Body", indent: bool = True, font_family: str = "Times New Roman"):
+    p = doc.add_paragraph(style=style)
     if not indent:
         p.paragraph_format.first_line_indent = Cm(0)
+    # Set base font on style override
+    _add_inline_runs(p, text, base_font=font_family, base_size=11)
     return p
+
+
+def _add_list(doc: Document, items: list, ordered: bool, font_family: str = "Times New Roman"):
+    for idx, raw in enumerate(items, 1):
+        p = doc.add_paragraph()
+        p.paragraph_format.left_indent = Cm(0.8)
+        p.paragraph_format.first_line_indent = Cm(-0.5)
+        p.paragraph_format.space_after = Pt(2)
+        p.paragraph_format.line_spacing = 1.15
+        prefix = f"{idx}." if ordered else "•"
+        # Marker run
+        mr = p.add_run(f"{prefix}  ")
+        mr.font.size = Pt(11)
+        mr.font.name = font_family
+        # Item content with inline formatting
+        _add_inline_runs(p, raw, base_font=font_family, base_size=11)
 
 
 def _add_page_break(doc: Document):
     p = doc.add_paragraph()
     p.add_run().add_break(WD_BREAK.PAGE)
+
+
+def _set_paragraph_shading(paragraph, color_hex: str):
+    pPr = paragraph.paragraph_format.element.get_or_add_pPr()
+    shd = OxmlElement("w:shd")
+    shd.set(qn("w:val"), "clear")
+    shd.set(qn("w:color"), "auto")
+    shd.set(qn("w:fill"), color_hex)
+    pPr.append(shd)
+
+
+def _set_paragraph_left_border(paragraph, color_hex: str = "475569", size: int = 24):
+    """Add a thick left border to mimic the PDF abstract bar."""
+    pPr = paragraph.paragraph_format.element.get_or_add_pPr()
+    pBdr = OxmlElement("w:pBdr")
+    left = OxmlElement("w:left")
+    left.set(qn("w:val"), "single")
+    left.set(qn("w:sz"), str(size))
+    left.set(qn("w:space"), "8")
+    left.set(qn("w:color"), color_hex)
+    pBdr.append(left)
+    pPr.append(pBdr)
+
+
+def _add_inline_runs(paragraph, text: str, base_font: str = "Times New Roman", base_size: int = 11):
+    """Parse markdown-ish inline: **bold**, *italic*, _underline_, and add runs."""
+    # tokens: split on ** first, then * inside non-bold, then _ inside both
+    pattern = re.compile(r"(\*\*[^*]+\*\*|\*[^*]+\*|_[^_]+_)")
+    parts = pattern.split(text)
+    for part in parts:
+        if not part:
+            continue
+        bold = italic = underline = False
+        seg = part
+        if part.startswith("**") and part.endswith("**"):
+            bold = True
+            seg = part[2:-2]
+        elif part.startswith("*") and part.endswith("*"):
+            italic = True
+            seg = part[1:-1]
+        elif part.startswith("_") and part.endswith("_"):
+            underline = True
+            seg = part[1:-1]
+        run = paragraph.add_run(seg)
+        run.font.name = base_font
+        run.font.size = Pt(base_size)
+        run.bold = bold
+        run.italic = italic
+        run.underline = underline
 
 
 def _shade_cell(cell, color_hex: str = "E2E8F0"):
@@ -341,7 +408,7 @@ def _add_figure(doc: Document, fig: Figure):
     cap.add_run(fig.caption)
 
 
-def _render_body(doc: Document, body: str, figures_map: dict):
+def _render_body(doc: Document, body: str, figures_map: dict, font_family: str = "Times New Roman"):
     if not body or not body.strip():
         return
     lines = body.split("\n")
@@ -354,11 +421,24 @@ def _render_body(doc: Document, body: str, figures_map: dict):
         text = " ".join(para_buf).strip()
         para_buf.clear()
         if text:
-            _add_body_para(doc, text)
+            _add_body_para(doc, text, font_family=font_family)
 
     while i < len(lines):
         ln = lines[i]
         stripped = ln.strip()
+
+        # Numbered or bullet list
+        if re.match(r"^(?:\d+\.|-|\*)\s+", stripped) and not re.match(r"^[-*]{3,}$", stripped):
+            flush()
+            ordered = bool(re.match(r"^\d+\.\s+", stripped))
+            items = []
+            while i < len(lines) and re.match(r"^(?:\d+\.|-|\*)\s+", lines[i].strip()) and not re.match(r"^[-*]{3,}$", lines[i].strip()):
+                t = lines[i].strip()
+                content = re.sub(r"^(?:\d+\.|-|\*)\s+", "", t)
+                items.append(content)
+                i += 1
+            _add_list(doc, items, ordered, font_family=font_family)
+            continue
 
         if re.match(r"^\[PAGE\s*BREAK\]$", stripped, re.IGNORECASE):
             flush()
@@ -513,11 +593,22 @@ def generate_docx(article: Article, citation_style: str = "apa") -> bytes:
                 af.paragraph_format.space_after = Pt(0)
 
     figures_map = {f.id: f for f in (article.figures or [])}
+    font_family = article.font_family or "Times New Roman"
 
-    # Abstract
+    # Abstract — styled with shading + left border (matches PDF preview)
     if article.abstract.english:
-        _heading(doc, "Abstract", level=1)
-        _add_body_para(doc, article.abstract.english, style="OpenJATS Abstract", indent=False)
+        # ABSTRACT title
+        ah = doc.add_paragraph(style="OpenJATS H2")
+        ah_run = ah.add_run("ABSTRACT")
+        ah_run.font.size = Pt(10)
+        ah_run.bold = True
+        _set_paragraph_shading(ah, "F1F5F9")
+        _set_paragraph_left_border(ah, "475569", 24)
+        # Body
+        ap = doc.add_paragraph(style="OpenJATS Abstract")
+        _add_inline_runs(ap, article.abstract.english, base_font=font_family, base_size=10)
+        _set_paragraph_shading(ap, "F1F5F9")
+        _set_paragraph_left_border(ap, "475569", 24)
 
     if article.keywords:
         kp = doc.add_paragraph(style="OpenJATS Abstract")
@@ -526,6 +617,8 @@ def generate_docx(article: Article, citation_style: str = "apa") -> bytes:
         kr.bold = True
         kr2 = kp.add_run(", ".join(article.keywords))
         kr2.italic = True
+        _set_paragraph_shading(kp, "F1F5F9")
+        _set_paragraph_left_border(kp, "475569", 24)
 
     history_bits = []
     if article.received_date:
@@ -542,10 +635,47 @@ def generate_docx(article: Article, citation_style: str = "apa") -> bytes:
         hr.font.size = Pt(9)
         hr.font.name = "Calibri"
         hp.paragraph_format.space_after = Pt(6)
+        _set_paragraph_shading(hp, "F1F5F9")
+        _set_paragraph_left_border(hp, "475569", 24)
+
+    # Creative Commons License block — matches PDF "license-banner"
+    lic_map = {
+        "CC-BY 4.0": ("CC BY 4.0", "https://creativecommons.org/licenses/by/4.0/"),
+        "CC-BY-SA 4.0": ("CC BY-SA 4.0", "https://creativecommons.org/licenses/by-sa/4.0/"),
+        "CC-BY-NC 4.0": ("CC BY-NC 4.0", "https://creativecommons.org/licenses/by-nc/4.0/"),
+        "CC-BY-NC-SA 4.0": ("CC BY-NC-SA 4.0", "https://creativecommons.org/licenses/by-nc-sa/4.0/"),
+        "CC-BY-ND 4.0": ("CC BY-ND 4.0", "https://creativecommons.org/licenses/by-nd/4.0/"),
+        "CC0": ("CC0 1.0 Universal", "https://creativecommons.org/publicdomain/zero/1.0/"),
+        "All rights reserved": ("All rights reserved", ""),
+    }
+    if article.license and article.license in lic_map:
+        lic_name, lic_url = lic_map[article.license]
+        lp = doc.add_paragraph()
+        lp.paragraph_format.space_before = Pt(8)
+        lp.paragraph_format.space_after = Pt(8)
+        lp.paragraph_format.first_line_indent = Cm(0)
+        r1 = lp.add_run(f"© {j.year or ''} The Author(s). ")
+        r1.bold = True
+        r1.font.size = Pt(9)
+        r1.font.name = "Calibri"
+        r2 = lp.add_run(f"Published under {lic_name}")
+        r2.font.size = Pt(9)
+        r2.font.name = "Calibri"
+        if lic_url:
+            r3 = lp.add_run(f" ({lic_url})")
+            r3.font.size = Pt(9)
+            r3.font.name = "Calibri"
+            r3.font.color.rgb = RGBColor(0x03, 0x69, 0xA1)
+        r4 = lp.add_run(". This is an open access article distributed under the terms of the license, which permits unrestricted use, distribution and reproduction provided the original work is properly cited.")
+        r4.font.size = Pt(9)
+        r4.font.name = "Calibri"
+        r4.italic = True
+        _set_paragraph_shading(lp, "F1F5F9")
+        _set_paragraph_left_border(lp, "0EA5E9", 24)
 
     if article.abstract.indonesian:
         _heading(doc, "Abstrak", level=1)
-        _add_body_para(doc, article.abstract.indonesian, style="OpenJATS Abstract", indent=False)
+        _add_body_para(doc, article.abstract.indonesian, style="OpenJATS Abstract", indent=False, font_family=font_family)
 
     sec_map = [
         ("Introduction", article.sections.introduction),
@@ -557,7 +687,7 @@ def generate_docx(article: Article, citation_style: str = "apa") -> bytes:
     for title, body in sec_map:
         if body and body.strip():
             _heading(doc, title, level=1)
-            _render_body(doc, body, figures_map)
+            _render_body(doc, body, figures_map, font_family=font_family)
 
     back_map = [
         ("Acknowledgements", article.sections.acknowledgement),
@@ -570,7 +700,7 @@ def generate_docx(article: Article, citation_style: str = "apa") -> bytes:
     for title, body in back_map:
         if body and body.strip():
             _heading(doc, title, level=2)
-            _add_body_para(doc, body, style="OpenJATS Body", indent=False)
+            _add_body_para(doc, body, style="OpenJATS Body", indent=False, font_family=font_family)
 
     if article.references:
         _heading(doc, "References", level=1)

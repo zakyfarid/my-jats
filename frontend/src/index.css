@@ -255,16 +255,52 @@ code, pre, .font-mono {
   [data-no-print="true"] { display: none !important; }
 }
 
-/* On-screen title justified across multi-line breaks */
+/* Reduce title size + natural justify (last line NOT forced to stretch) */
 .pdf-preview .pdf-title {
   text-align: justify;
   text-justify: inter-word;
+  font-size: 1.5rem;
+  line-height: 1.25;
 }
-/* Last line of justified title stays left for readability */
-.pdf-preview .pdf-title::after {
-  content: "";
-  display: inline-block;
-  width: 100%;
+/* Removed ::after trick so last line stays naturally left-aligned */
+
+/* CC License banner */
+.pdf-license-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #f1f5f9;
+  border-left: 4px solid #0ea5e9;
+  padding: 12px 14px;
+  margin-top: 6px;
+  font-family: "IBM Plex Sans", sans-serif;
+  font-size: 11px;
+  color: #0f172a;
+}
+.pdf-license-banner .cc-icon {
+  width: 36px;
+  height: 36px;
+  shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid #0f172a;
+  border-radius: 50%;
+  font-weight: 800;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+.pdf-license-banner a { color: #0369a1; text-decoration: underline; }
+
+/* List rendering in body */
+.pdf-preview .pdf-body ul,
+.pdf-preview .pdf-body ol {
+  margin: 6px 0 6px 1.2rem;
+  padding: 0;
+}
+.pdf-preview .pdf-body li {
+  margin: 2px 0;
+  line-height: 1.55;
 }
 
 /* Editor textarea uniform style */

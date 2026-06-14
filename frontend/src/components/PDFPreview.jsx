@@ -1,8 +1,26 @@
 import React from "react";
 import { Printer } from "lucide-react";
 
+// License code → display info
+const LICENSES = {
+  "CC-BY 4.0": { name: "CC BY 4.0", url: "https://creativecommons.org/licenses/by/4.0/", icon: "BY" },
+  "CC-BY-SA 4.0": { name: "CC BY-SA 4.0", url: "https://creativecommons.org/licenses/by-sa/4.0/", icon: "BY-SA" },
+  "CC-BY-NC 4.0": { name: "CC BY-NC 4.0", url: "https://creativecommons.org/licenses/by-nc/4.0/", icon: "BY-NC" },
+  "CC-BY-NC-SA 4.0": { name: "CC BY-NC-SA 4.0", url: "https://creativecommons.org/licenses/by-nc-sa/4.0/", icon: "BY-NC-SA" },
+  "CC-BY-ND 4.0": { name: "CC BY-ND 4.0", url: "https://creativecommons.org/licenses/by-nd/4.0/", icon: "BY-ND" },
+  "CC0": { name: "CC0 1.0 Universal", url: "https://creativecommons.org/publicdomain/zero/1.0/", icon: "CC0" },
+  "All rights reserved": { name: "All rights reserved", url: "", icon: "©" },
+};
+
 function renderInline(text) {
+  // Order: bold first (**), then italic (*), then underline (_), then citations
   return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+    .replace(/_([^_\n]+)_/g, '<u>$1</u>')
     .replace(/\[@([^\]]+)\]/g, '<sup class="text-blue-700">[$1]</sup>')
     .replace(/\[\^footnote:([^\]]*)\]/g, '<sup class="text-zinc-500">[fn:$1]</sup>');
 }
@@ -30,6 +48,30 @@ function renderBlocks(body, figuresMap, keyPrefix = "") {
   while (i < lines.length) {
     const ln = lines[i];
     const trimmed = ln.trim();
+
+    // Numbered list (1. item) or bullet list (- item)
+    if (/^(?:\d+\.|-|\*)\s+/.test(trimmed) && !/^[-*]{3,}$/.test(trimmed)) {
+      flushPara();
+      const isOrdered = /^\d+\.\s+/.test(trimmed);
+      const items = [];
+      while (i < lines.length && /^(?:\d+\.|-|\*)\s+/.test(lines[i].trim()) && !/^[-*]{3,}$/.test(lines[i].trim())) {
+        const t = lines[i].trim();
+        const content = t.replace(/^(?:\d+\.|-|\*)\s+/, "");
+        items.push(content);
+        i++;
+      }
+      const Tag = isOrdered ? "ol" : "ul";
+      blocks.push(
+        React.createElement(
+          Tag,
+          { key: `${keyPrefix}list-${i}`, className: isOrdered ? "list-decimal" : "list-disc" },
+          items.map((it, k) => (
+            <li key={k} dangerouslySetInnerHTML={{ __html: renderInline(it) }} />
+          ))
+        )
+      );
+      continue;
+    }
 
     // Page break
     if (/^\[PAGE\s*BREAK\]$/i.test(trimmed)) {
@@ -227,7 +269,11 @@ export function PDFPreview({ article, formattedRefs = [], issueInfo }) {
         </button>
       </div>
       <div className="flex-1 overflow-auto p-8 bg-zinc-800">
-        <div className="pdf-preview shadow-xl rounded-sm" data-testid="pdf-content">
+        <div
+          className="pdf-preview shadow-xl rounded-sm"
+          style={{ fontFamily: `"${article.font_family || "Merriweather"}", Georgia, serif` }}
+          data-testid="pdf-content"
+        >
           {/* Custom Journal Header with Logo */}
           {(j.logo || j.custom_header || j.title) && (
             <div className="border-b-2 border-zinc-700 pb-4 mb-6 flex items-center gap-4" data-testid="pdf-custom-header">
@@ -266,7 +312,7 @@ export function PDFPreview({ article, formattedRefs = [], issueInfo }) {
             <span>doi: {article.doi || "—"}</span>
           </div>
 
-          <h1 className="pdf-title text-3xl mb-2 leading-tight" style={{ color: "#0f172a" }}>
+          <h1 className="pdf-title mb-2" style={{ color: "#0f172a" }}>
             {article.title || "Untitled Article"}
           </h1>
           {article.subtitle && <p className="text-lg italic text-zinc-600 mb-4">{article.subtitle}</p>}
@@ -329,6 +375,25 @@ export function PDFPreview({ article, formattedRefs = [], issueInfo }) {
                   )}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Creative Commons License banner */}
+          {article.license && LICENSES[article.license] && (
+            <div className="pdf-license-banner" data-testid="pdf-license-banner">
+              <div className="cc-icon">{LICENSES[article.license].icon}</div>
+              <div>
+                <strong>© {j.year || new Date().getFullYear()} The Author(s).</strong>{" "}
+                Published under{" "}
+                {LICENSES[article.license].url ? (
+                  <a href={LICENSES[article.license].url} target="_blank" rel="noopener noreferrer">
+                    {LICENSES[article.license].name}
+                  </a>
+                ) : (
+                  LICENSES[article.license].name
+                )}
+                . This is an open access article distributed under the terms of the license, which permits unrestricted use, distribution and reproduction provided the original work is properly cited.
+              </div>
             </div>
           )}
 
