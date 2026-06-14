@@ -1,16 +1,20 @@
-"""Generate DOCX file from an Article — with figures, tables, and proper formatting."""
-import re
+"""Generate DOCX file from an Article — with proper page header, figures,
+tables, and a locked 'OpenJATS Body' paragraph style for clean justify."""
 import base64
 from io import BytesIO
+import re
 from docx import Document
-from docx.shared import Pt, Inches, Cm, RGBColor
-from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_BREAK
+from docx.shared import Pt, Inches, Cm, RGBColor, Emu
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_BREAK, WD_LINE_SPACING
 from docx.enum.table import WD_TABLE_ALIGNMENT
-from docx.oxml.ns import qn
+from docx.enum.style import WD_STYLE_TYPE
+from docx.oxml.ns import qn, nsmap
 from docx.oxml import OxmlElement
-from models import Article, Figure
+from models import Article, Figure, Journal
 from citation_formatter import format_references
 
+
+# ---------- Setup helpers ----------
 
 def _set_margins(doc: Document):
     for section in doc.sections:
@@ -18,94 +22,236 @@ def _set_margins(doc: Document):
         section.bottom_margin = Cm(2.5)
         section.left_margin = Cm(2.5)
         section.right_margin = Cm(2.5)
+        # Header / footer distance
+        section.header_distance = Cm(1.0)
+        section.footer_distance = Cm(1.0)
 
 
-def _heading(doc: Document, text: str, level: int = 1):
-    p = doc.add_paragraph()
-    run = p.add_run(text)
-    run.bold = True
-    if level == 1:
-        run.font.size = Pt(13)
-    elif level == 2:
-        run.font.size = Pt(12)
-    else:
-        run.font.size = Pt(11)
-    p.paragraph_format.space_before = Pt(10)
-    p.paragraph_format.space_after = Pt(6)
-    p.paragraph_format.keep_with_next = True
-    return p
-
-
-def _set_justify(paragraph):
-    paragraph.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-    # Disable automatic hyphenation
-    p_pr = paragraph.paragraph_format.element.get_or_add_pPr()
+def _suppress_hyphens(paragraph):
+    """Disable auto-hyphenation on a paragraph."""
+    pPr = paragraph.paragraph_format.element.get_or_add_pPr()
     sup = OxmlElement("w:suppressAutoHyphens")
     sup.set(qn("w:val"), "true")
-    p_pr.append(sup)
+    pPr.append(sup)
 
 
-def _add_paragraph(doc: Document, text: str, indent: bool = True):
-    p = doc.add_paragraph()
-    run = p.add_run(text)
-    run.font.size = Pt(11)
-    _set_justify(p)
-    if indent:
-        p.paragraph_format.first_line_indent = Cm(0.5)
-    p.paragraph_format.space_after = Pt(4)
-    p.paragraph_format.line_spacing = 1.15
-    return p
+def _register_styles(doc: Document):
+    """Register custom paragraph styles for body text, headings, captions."""
+    styles = doc.styles
+
+    # Body style — justified, line 1.15, no hyphenation, indent 0.5cm
+    if "OpenJATS Body" not in styles:
+        body = styles.add_style("OpenJATS Body", WD_STYLE_TYPE.PARAGRAPH)
+        body.base_style = styles["Normal"]
+        body.font.name = "Times New Roman"
+        body.font.size = Pt(11)
+        pf = body.paragraph_format
+        pf.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+        pf.first_line_indent = Cm(0.5)
+        pf.line_spacing = 1.15
+        pf.space_after = Pt(4)
+        # Disable hyphenation at style level
+        pPr = body.element.get_or_add_pPr()
+        sup = OxmlElement("w:suppressAutoHyphens")
+        sup.set(qn("w:val"), "true")
+        pPr.append(sup)
+
+    if "OpenJATS Abstract" not in styles:
+        absty = styles.add_style("OpenJATS Abstract", WD_STYLE_TYPE.PARAGRAPH)
+        absty.base_style = styles["Normal"]
+        absty.font.name = "Times New Roman"
+        absty.font.size = Pt(10)
+        pf = absty.paragraph_format
+        pf.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+        pf.line_spacing = 1.15
+        pf.space_after = Pt(4)
+        pPr = absty.element.get_or_add_pPr()
+        sup = OxmlElement("w:suppressAutoHyphens")
+        sup.set(qn("w:val"), "true")
+        pPr.append(sup)
+
+    if "OpenJATS H1" not in styles:
+        h1 = styles.add_style("OpenJATS H1", WD_STYLE_TYPE.PARAGRAPH)
+        h1.font.name = "Calibri"
+        h1.font.size = Pt(13)
+        h1.font.bold = True
+        h1.font.color.rgb = RGBColor(0x1E, 0x29, 0x3B)
+        pf = h1.paragraph_format
+        pf.space_before = Pt(10)
+        pf.space_after = Pt(4)
+        pf.keep_with_next = True
+
+    if "OpenJATS H2" not in styles:
+        h2 = styles.add_style("OpenJATS H2", WD_STYLE_TYPE.PARAGRAPH)
+        h2.font.name = "Calibri"
+        h2.font.size = Pt(12)
+        h2.font.bold = True
+        h2.font.color.rgb = RGBColor(0x33, 0x40, 0x55)
+        pf = h2.paragraph_format
+        pf.space_before = Pt(8)
+        pf.space_after = Pt(3)
+        pf.keep_with_next = True
+
+    if "OpenJATS Caption" not in styles:
+        cap = styles.add_style("OpenJATS Caption", WD_STYLE_TYPE.PARAGRAPH)
+        cap.base_style = styles["Normal"]
+        cap.font.name = "Calibri"
+        cap.font.size = Pt(9)
+        cap.font.italic = True
+        cap.font.color.rgb = RGBColor(0x47, 0x55, 0x69)
+        pf = cap.paragraph_format
+        pf.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        pf.space_after = Pt(6)
+        pf.space_before = Pt(2)
+
+    if "OpenJATS Reference" not in styles:
+        ref = styles.add_style("OpenJATS Reference", WD_STYLE_TYPE.PARAGRAPH)
+        ref.base_style = styles["Normal"]
+        ref.font.name = "Times New Roman"
+        ref.font.size = Pt(10)
+        pf = ref.paragraph_format
+        pf.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+        pf.line_spacing = 1.15
+        pf.left_indent = Cm(0.7)
+        pf.first_line_indent = Cm(-0.7)
+        pf.space_after = Pt(3)
+        pPr = ref.element.get_or_add_pPr()
+        sup = OxmlElement("w:suppressAutoHyphens")
+        sup.set(qn("w:val"), "true")
+        pPr.append(sup)
 
 
-def _add_page_break(doc: Document):
-    p = doc.add_paragraph()
-    run = p.add_run()
-    run.add_break(WD_BREAK.PAGE)
+def _set_page_borders(doc: Document):
+    """Add a subtle bottom border under the page header."""
+    pass  # handled per paragraph if needed
 
 
-def _figure_bytes(fig: Figure) -> bytes:
-    """Decode base64 data URL to image bytes."""
-    if not fig.data_url:
+def _decode_data_url(data_url: str) -> bytes:
+    if not data_url:
         return b""
-    data = fig.data_url
-    if "," in data:
-        data = data.split(",", 1)[1]
+    data = data_url.split(",", 1)[1] if "," in data_url else data_url
     try:
         return base64.b64decode(data)
     except Exception:
         return b""
 
 
-def _add_figure(doc: Document, fig: Figure):
-    img_bytes = _figure_bytes(fig)
-    if not img_bytes:
-        return
-    # SVG not directly supported by python-docx; embed only raster
-    if "svg" in (fig.data_url or "").lower():
-        p = doc.add_paragraph()
-        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        run = p.add_run(f"[{fig.label}: SVG image — see digital version]")
-        run.italic = True
-        run.font.size = Pt(10)
-    else:
-        width = Cm(14) if fig.width == "full" else Cm(8) if fig.width == "half" else Cm(5)
-        p = doc.add_paragraph()
-        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        try:
-            doc.add_picture(BytesIO(img_bytes), width=width)
-        except Exception:
-            run = p.add_run(f"[{fig.label}: image could not be embedded]")
-            run.italic = True
-    # caption
-    cap = doc.add_paragraph()
-    cap.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    label_run = cap.add_run(f"{fig.label}. ")
-    label_run.bold = True
-    label_run.font.size = Pt(10)
-    cap_run = cap.add_run(fig.caption)
-    cap_run.font.size = Pt(10)
-    cap_run.italic = True
-    cap.paragraph_format.space_after = Pt(8)
+def _build_page_header(doc: Document, j: Journal, article: Article):
+    """Construct a locked page header with logo + journal title + meta info.
+    Repeats on every page; not part of body content."""
+    section = doc.sections[0]
+    section.different_first_page_header_footer = False
+    header = section.header
+    # Clear any default
+    for p in list(header.paragraphs):
+        p.clear()
+
+    # First paragraph: logo + journal title (two-column-ish via tab)
+    p1 = header.paragraphs[0]
+    p1.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    # Embed raster logo
+    if j.logo and "svg" not in (j.logo or "").lower():
+        img_bytes = _decode_data_url(j.logo)
+        if img_bytes:
+            run = p1.add_run()
+            try:
+                run.add_picture(BytesIO(img_bytes), height=Cm(1.2))
+            except Exception:
+                pass
+            p1.add_run("  ")  # spacing after logo
+
+    title_run = p1.add_run(j.title or "")
+    title_run.bold = True
+    title_run.font.size = Pt(10)
+    title_run.font.name = "Calibri"
+    title_run.font.color.rgb = RGBColor(0x1E, 0x29, 0x3B)
+
+    # Second paragraph: custom header + meta
+    p2 = header.add_paragraph()
+    p2.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    bits = []
+    if j.custom_header:
+        bits.append(j.custom_header)
+    meta_parts = []
+    if j.volume or j.issue or j.year:
+        meta_parts.append(f"Vol. {j.volume or '—'}, No. {j.issue or '—'} ({j.year or '—'})")
+    if j.issn:
+        meta_parts.append(f"ISSN: {j.issn}")
+    if j.eissn:
+        meta_parts.append(f"e-ISSN: {j.eissn}")
+    if meta_parts:
+        bits.append("  ·  ".join(meta_parts))
+    if bits:
+        meta_run = p2.add_run("  ·  ".join(bits))
+        meta_run.font.size = Pt(8)
+        meta_run.font.name = "Calibri"
+        meta_run.font.color.rgb = RGBColor(0x47, 0x55, 0x69)
+        meta_run.italic = True
+
+    # Bottom border under header
+    pPr = p2.paragraph_format.element.get_or_add_pPr()
+    pBdr = OxmlElement("w:pBdr")
+    bottom = OxmlElement("w:bottom")
+    bottom.set(qn("w:val"), "single")
+    bottom.set(qn("w:sz"), "6")
+    bottom.set(qn("w:space"), "1")
+    bottom.set(qn("w:color"), "475569")
+    pBdr.append(bottom)
+    pPr.append(pBdr)
+
+
+def _build_page_footer(doc: Document):
+    """Build a footer with page number  '1 / N'."""
+    section = doc.sections[0]
+    footer = section.footer
+    for p in list(footer.paragraphs):
+        p.clear()
+    fp = footer.paragraphs[0]
+    fp.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    def _field(instr: str):
+        fld = OxmlElement("w:fldSimple")
+        fld.set(qn("w:instr"), instr)
+        r = OxmlElement("w:r")
+        rPr = OxmlElement("w:rPr")
+        sz = OxmlElement("w:sz")
+        sz.set(qn("w:val"), "18")
+        rPr.append(sz)
+        rFonts = OxmlElement("w:rFonts")
+        rFonts.set(qn("w:ascii"), "Calibri")
+        rPr.append(rFonts)
+        r.append(rPr)
+        t = OxmlElement("w:t")
+        t.text = "1"
+        r.append(t)
+        fld.append(r)
+        return fld
+
+    fp._p.append(_field("PAGE"))
+    sep_run = fp.add_run(" / ")
+    sep_run.font.size = Pt(9)
+    sep_run.font.name = "Calibri"
+    fp._p.append(_field("NUMPAGES"))
+
+
+# ---------- Body helpers ----------
+
+def _heading(doc: Document, text: str, level: int = 1):
+    style_name = "OpenJATS H1" if level == 1 else "OpenJATS H2"
+    p = doc.add_paragraph(text, style=style_name)
+    return p
+
+
+def _add_body_para(doc: Document, text: str, style: str = "OpenJATS Body", indent: bool = True):
+    p = doc.add_paragraph(text, style=style)
+    if not indent:
+        p.paragraph_format.first_line_indent = Cm(0)
+    return p
+
+
+def _add_page_break(doc: Document):
+    p = doc.add_paragraph()
+    p.add_run().add_break(WD_BREAK.PAGE)
 
 
 def _shade_cell(cell, color_hex: str = "E2E8F0"):
@@ -117,21 +263,39 @@ def _shade_cell(cell, color_hex: str = "E2E8F0"):
     tc_pr.append(shd)
 
 
-def _add_table(doc: Document, label: str, caption: str, rows: list):
-    """rows: list of list[str], first row = header."""
+def _set_col_widths(table, widths_cm):
+    for row in table.rows:
+        for i, cell in enumerate(row.cells):
+            if i < len(widths_cm) and widths_cm[i] > 0:
+                cell.width = Cm(widths_cm[i])
+
+
+def _parse_table_rows(lines: list) -> list:
+    rows = []
+    for ln in lines:
+        if not ln.strip().startswith("|"):
+            continue
+        stripped = ln.strip()
+        if re.match(r"^\|\s*-+\s*(\|\s*-+\s*)*\|?$", stripped):
+            continue
+        cells = stripped.strip("|").split("|")
+        rows.append([c.strip() for c in cells])
+    return rows
+
+
+def _add_table(doc: Document, label: str, caption: str, rows: list, widths_cm=None):
     if not rows or not rows[0]:
         return
-    # Caption above table
     if label or caption:
-        cap = doc.add_paragraph()
+        cap = doc.add_paragraph(style="OpenJATS Caption")
         cap.alignment = WD_ALIGN_PARAGRAPH.LEFT
         if label:
             r = cap.add_run(f"{label}. ")
             r.bold = True
-            r.font.size = Pt(10)
-        r2 = cap.add_run(caption)
-        r2.font.size = Pt(10)
+            r.italic = False
+        cap.add_run(caption)
         cap.paragraph_format.keep_with_next = True
+        cap.paragraph_format.space_after = Pt(2)
 
     cols = len(rows[0])
     table = doc.add_table(rows=len(rows), cols=cols)
@@ -145,99 +309,114 @@ def _add_table(doc: Document, label: str, caption: str, rows: list):
             p = cell.paragraphs[0]
             run = p.add_run(value)
             run.font.size = Pt(10)
+            run.font.name = "Times New Roman"
             if r_idx == 0:
                 run.bold = True
                 _shade_cell(cell, "E2E8F0")
-    # spacing after table
-    doc.add_paragraph().paragraph_format.space_after = Pt(8)
+    if widths_cm:
+        _set_col_widths(table, widths_cm)
+    doc.add_paragraph().paragraph_format.space_after = Pt(6)
 
 
-def _parse_table_rows(lines: list) -> list:
-    """Parse markdown-table lines into list-of-lists, skipping the separator row."""
-    rows = []
-    for ln in lines:
-        if not ln.strip().startswith("|"):
-            continue
-        stripped = ln.strip()
-        if re.match(r"^\|\s*-+\s*(\|\s*-+\s*)*\|?$", stripped):
-            continue
-        cells = stripped.strip("|").split("|")
-        rows.append([c.strip() for c in cells])
-    return rows
+def _add_figure(doc: Document, fig: Figure):
+    img_bytes = _decode_data_url(fig.data_url)
+    if not img_bytes or "svg" in (fig.data_url or "").lower():
+        p = doc.add_paragraph(style="OpenJATS Caption")
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        run = p.add_run(f"[{fig.label}: image not embeddable]")
+        run.italic = True
+        return
+    width = Cm(14) if fig.width == "full" else Cm(8) if fig.width == "half" else Cm(5)
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    try:
+        doc.add_picture(BytesIO(img_bytes), width=width)
+    except Exception:
+        pass
+    cap = doc.add_paragraph(style="OpenJATS Caption")
+    cap.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    label_run = cap.add_run(f"{fig.label}. ")
+    label_run.bold = True
+    label_run.italic = False
+    cap.add_run(fig.caption)
 
 
 def _render_body(doc: Document, body: str, figures_map: dict):
-    """Render a section body line by line, dispatching to figure / table / page break / paragraph."""
     if not body or not body.strip():
         return
     lines = body.split("\n")
     i = 0
     para_buf = []
 
-    def flush_para():
+    def flush():
         if not para_buf:
             return
         text = " ".join(para_buf).strip()
         para_buf.clear()
         if text:
-            _add_paragraph(doc, text)
+            _add_body_para(doc, text)
 
     while i < len(lines):
         ln = lines[i]
         stripped = ln.strip()
 
-        # Page break
         if re.match(r"^\[PAGE\s*BREAK\]$", stripped, re.IGNORECASE):
-            flush_para()
+            flush()
             _add_page_break(doc)
             i += 1
             continue
 
-        # Figure reference
         m_fig = re.match(r"^\[Figure:([^\]]+)\]\s*$", stripped)
         if m_fig:
-            flush_para()
+            flush()
             fig = figures_map.get(m_fig.group(1).strip())
             if fig:
                 _add_figure(doc, fig)
             i += 1
             continue
 
-        # Table block
         m_tbl = re.match(r"^\[Table:([^\]]+)\]\s*(.*)?$", stripped)
+        widths_marker = None
         if m_tbl or stripped.startswith("|"):
-            flush_para()
+            flush()
             label = ""
             caption = ""
             if m_tbl:
                 label = m_tbl.group(1).strip()
                 caption = (m_tbl.group(2) or "").strip()
                 i += 1
-            # Collect contiguous table rows
+            # Read optional widths line: [widths: 3, 4, 5] (cm) or 20%,40%,40%
+            if i < len(lines) and re.match(r"^\s*\[widths:[^\]]+\]\s*$", lines[i], re.IGNORECASE):
+                wmatch = re.match(r"^\s*\[widths:\s*([^\]]+)\s*\]\s*$", lines[i], re.IGNORECASE)
+                if wmatch:
+                    widths_marker = wmatch.group(1)
+                i += 1
             tbl_lines = []
             while i < len(lines) and lines[i].strip().startswith("|"):
                 tbl_lines.append(lines[i])
                 i += 1
             parsed = _parse_table_rows(tbl_lines)
+            widths_cm = None
+            if widths_marker and parsed:
+                cols = len(parsed[0])
+                widths_cm = _resolve_widths(widths_marker, cols, page_width_cm=16.0)
             if parsed:
-                _add_table(doc, label, caption, parsed)
+                _add_table(doc, label, caption, parsed, widths_cm=widths_cm)
             continue
 
-        # Heading
         if stripped.startswith("### "):
-            flush_para()
-            _heading(doc, stripped[4:].strip(), level=3)
+            flush()
+            _heading(doc, stripped[4:].strip(), level=2)
             i += 1
             continue
         if stripped.startswith("## "):
-            flush_para()
-            _heading(doc, stripped[3:].strip(), level=2)
+            flush()
+            _heading(doc, stripped[3:].strip(), level=1)
             i += 1
             continue
 
-        # Formula (inline display)
         if stripped.startswith("$$") and stripped.endswith("$$") and len(stripped) >= 4:
-            flush_para()
+            flush()
             p = doc.add_paragraph()
             p.alignment = WD_ALIGN_PARAGRAPH.CENTER
             run = p.add_run(stripped[2:-2].strip())
@@ -246,78 +425,72 @@ def _render_body(doc: Document, body: str, figures_map: dict):
             i += 1
             continue
 
-        # Blank line
         if not stripped:
-            flush_para()
+            flush()
             i += 1
             continue
-
         para_buf.append(stripped)
         i += 1
+    flush()
 
-    flush_para()
 
+def _resolve_widths(spec: str, cols: int, page_width_cm: float = 16.0):
+    """Parse '20%, 40%, 40%' or '3, 4, 5' into list of cm widths."""
+    parts = [p.strip() for p in spec.split(",") if p.strip()]
+    out = []
+    for p in parts:
+        if p.endswith("%"):
+            try:
+                v = float(p.rstrip("%"))
+                out.append(page_width_cm * v / 100.0)
+            except ValueError:
+                out.append(0)
+        else:
+            try:
+                out.append(float(p))
+            except ValueError:
+                out.append(0)
+    # pad/truncate
+    while len(out) < cols:
+        out.append(0)
+    return out[:cols]
+
+
+# ---------- Top-level ----------
 
 def generate_docx(article: Article, citation_style: str = "apa") -> bytes:
     doc = Document()
     _set_margins(doc)
+    _register_styles(doc)
 
-    style = doc.styles["Normal"]
-    style.font.name = "Times New Roman"
-    style.font.size = Pt(11)
-
-    # Custom header with journal info
     j = article.journal
-    if j.title:
-        head = doc.add_paragraph()
-        head.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        r = head.add_run(j.title)
-        r.bold = True
-        r.font.size = Pt(11)
-        if j.custom_header:
-            head.add_run("\n")
-            run2 = head.add_run(j.custom_header)
-            run2.italic = True
-            run2.font.size = Pt(9)
-        meta = doc.add_paragraph()
-        meta.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        meta_run = meta.add_run(
-            f"Vol. {j.volume or '—'}, No. {j.issue or '—'} ({j.year or '—'})  ·  ISSN: {j.issn or '—'}  ·  e-ISSN: {j.eissn or '—'}"
-        )
-        meta_run.font.size = Pt(9)
-        meta_run.font.color.rgb = RGBColor(0x47, 0x55, 0x69)
+    _build_page_header(doc, j, article)
+    _build_page_footer(doc)
 
-    # Embed journal logo (if raster)
-    if j.logo and "svg" not in (j.logo or "").lower():
-        try:
-            data = j.logo.split(",", 1)[1] if "," in j.logo else j.logo
-            img_bytes = base64.b64decode(data)
-            logo_p = doc.add_paragraph()
-            logo_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            doc.add_picture(BytesIO(img_bytes), height=Cm(2.0))
-        except Exception:
-            pass
-
-    # Title
-    t = doc.add_paragraph()
-    t.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    tr = t.add_run(article.title or "Untitled")
+    # Title — justified (rata kiri-kanan)
+    title_p = doc.add_paragraph()
+    title_p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    title_p.paragraph_format.space_before = Pt(6)
+    title_p.paragraph_format.space_after = Pt(4)
+    tr = title_p.add_run(article.title or "Untitled")
     tr.bold = True
     tr.font.size = Pt(16)
-    t.paragraph_format.space_before = Pt(12)
-    t.paragraph_format.space_after = Pt(4)
+    tr.font.name = "Calibri"
+    _suppress_hyphens(title_p)
 
     if article.subtitle:
         sub = doc.add_paragraph()
-        sub.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        sub.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
         sr = sub.add_run(article.subtitle)
         sr.italic = True
         sr.font.size = Pt(12)
+        sr.font.name = "Calibri"
+        _suppress_hyphens(sub)
 
     # Authors
     if article.authors:
         ap = doc.add_paragraph()
-        ap.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        ap.alignment = WD_ALIGN_PARAGRAPH.LEFT
         names = []
         for a in article.authors:
             n = a.full_name or f"{a.given_name} {a.family_name}".strip()
@@ -326,32 +499,34 @@ def generate_docx(article: Article, citation_style: str = "apa") -> bytes:
             names.append(n)
         names_run = ap.add_run(", ".join(names))
         names_run.font.size = Pt(11)
+        names_run.font.name = "Times New Roman"
+        names_run.bold = True
 
         for i, a in enumerate(article.authors, 1):
             if a.affiliation:
                 af = doc.add_paragraph()
-                af.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                af.alignment = WD_ALIGN_PARAGRAPH.LEFT
                 afr = af.add_run(f"{i}. {a.affiliation}{(', ' + a.country) if a.country else ''}")
                 afr.italic = True
                 afr.font.size = Pt(9)
+                afr.font.name = "Times New Roman"
+                af.paragraph_format.space_after = Pt(0)
 
     figures_map = {f.id: f for f in (article.figures or [])}
 
     # Abstract
     if article.abstract.english:
-        _heading(doc, "Abstract", level=2)
-        _add_paragraph(doc, article.abstract.english, indent=False)
+        _heading(doc, "Abstract", level=1)
+        _add_body_para(doc, article.abstract.english, style="OpenJATS Abstract", indent=False)
 
     if article.keywords:
-        kp = doc.add_paragraph()
+        kp = doc.add_paragraph(style="OpenJATS Abstract")
+        kp.paragraph_format.first_line_indent = Cm(0)
         kr = kp.add_run("Keywords: ")
         kr.bold = True
-        kr.font.size = Pt(10)
         kr2 = kp.add_run(", ".join(article.keywords))
-        kr2.font.size = Pt(10)
         kr2.italic = True
 
-    # History dates
     history_bits = []
     if article.received_date:
         history_bits.append(f"Received: {article.received_date}")
@@ -365,13 +540,13 @@ def generate_docx(article: Article, citation_style: str = "apa") -> bytes:
         hr = hp.add_run(" · ".join(history_bits))
         hr.italic = True
         hr.font.size = Pt(9)
+        hr.font.name = "Calibri"
+        hp.paragraph_format.space_after = Pt(6)
 
-    # Indonesian abstract
     if article.abstract.indonesian:
-        _heading(doc, "Abstrak", level=2)
-        _add_paragraph(doc, article.abstract.indonesian, indent=False)
+        _heading(doc, "Abstrak", level=1)
+        _add_body_para(doc, article.abstract.indonesian, style="OpenJATS Abstract", indent=False)
 
-    # IMRAD sections (with rich rendering)
     sec_map = [
         ("Introduction", article.sections.introduction),
         ("Methods", article.sections.methods),
@@ -384,7 +559,6 @@ def generate_docx(article: Article, citation_style: str = "apa") -> bytes:
             _heading(doc, title, level=1)
             _render_body(doc, body, figures_map)
 
-    # Back matter
     back_map = [
         ("Acknowledgements", article.sections.acknowledgement),
         ("Funding", article.sections.funding),
@@ -396,21 +570,13 @@ def generate_docx(article: Article, citation_style: str = "apa") -> bytes:
     for title, body in back_map:
         if body and body.strip():
             _heading(doc, title, level=2)
-            _add_paragraph(doc, body, indent=False)
+            _add_body_para(doc, body, style="OpenJATS Body", indent=False)
 
-    # References (with hanging indent)
     if article.references:
         _heading(doc, "References", level=1)
         formatted = format_references(article.references, citation_style)
         for line in formatted:
-            p = doc.add_paragraph()
-            run = p.add_run(line)
-            run.font.size = Pt(10)
-            p.paragraph_format.left_indent = Cm(0.7)
-            p.paragraph_format.first_line_indent = Cm(-0.7)
-            p.paragraph_format.space_after = Pt(3)
-            p.paragraph_format.line_spacing = 1.15
-            _set_justify(p)
+            doc.add_paragraph(line, style="OpenJATS Reference")
 
     buf = BytesIO()
     doc.save(buf)

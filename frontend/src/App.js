@@ -5,6 +5,7 @@ import { Toaster } from "sonner";
 import Dashboard from "@/pages/Dashboard";
 import Editor from "@/pages/Editor";
 import Templates from "@/pages/Templates";
+import PrintView from "@/pages/PrintView";
 
 function App() {
   React.useEffect(() => {
@@ -21,6 +22,7 @@ function App() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/editor/:id" element={<Editor />} />
           <Route path="/templates" element={<Templates />} />
+          <Route path="/print/:id" element={<PrintView />} />
         </Routes>
         <Toaster
           position="bottom-right"

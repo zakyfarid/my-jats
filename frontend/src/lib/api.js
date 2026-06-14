@@ -24,6 +24,7 @@ export const api = {
 
   downloadXML: (id, kind) => `${API_BASE}/articles/${id}/${kind}?download=true`,
   downloadDOCX: (id, style = "apa") => `${API_BASE}/articles/${id}/docx?style=${style}`,
+  downloadPDF: (id) => `${API_BASE}/articles/${id}/pdf`,
 
   importReferences: (format, content) =>
     client.post("/references/import", { format, content }).then((r) => r.data),

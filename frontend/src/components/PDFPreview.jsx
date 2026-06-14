@@ -88,10 +88,19 @@ function renderBlocks(body, figuresMap, keyPrefix = "") {
       flushPara();
       let label = "";
       let caption = "";
+      let widths = null;
       if (tableLabelMatch) {
         label = tableLabelMatch[1].trim();
         caption = (tableLabelMatch[2] || "").trim();
         i++;
+      }
+      // Optional widths line
+      if (i < lines.length) {
+        const wm = lines[i].match(/^\s*\[widths:\s*([^\]]+)\s*\]\s*$/i);
+        if (wm) {
+          widths = wm[1].split(",").map((w) => w.trim());
+          i++;
+        }
       }
       // Collect contiguous table rows
       const rows = [];
@@ -114,6 +123,13 @@ function renderBlocks(body, figuresMap, keyPrefix = "") {
               </div>
             )}
             <table className="pdf-table">
+              {widths && (
+                <colgroup>
+                  {widths.map((w, k) => (
+                    <col key={k} style={{ width: w && w !== "auto" ? w : "auto" }} />
+                  ))}
+                </colgroup>
+              )}
               <thead>
                 <tr>
                   {headerRow.map((h, k) => (

@@ -19,6 +19,7 @@ from reference_text_parser import parse_references_text
 from citation_formatter import format_references
 from external_lookup import lookup_crossref, lookup_orcid
 from docx_generator import generate_docx
+from pdf_generator import generate_pdf_from_url
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
@@ -216,6 +217,23 @@ async def get_docx(article_id: str, style: str = "apa"):
         content=data,
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         headers={"Content-Disposition": f'attachment; filename="{article.id}.docx"'},
+    )
+
+
+@api_router.get("/articles/{article_id}/pdf")
+async def get_pdf(article_id: str):
+    doc = await db.articles.find_one({"id": article_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Article not found")
+    print_url = f"http://localhost:3000/print/{article_id}"
+    try:
+        data = await generate_pdf_from_url(print_url)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"PDF generation failed: {e}")
+    return Response(
+        content=data,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{article_id}.pdf"'},
     )
 
 

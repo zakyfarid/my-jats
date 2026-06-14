@@ -211,7 +211,8 @@ export default function Editor() {
             <a href={downloadXMLLink("pkp")} data-testid="export-pkp" className="block px-3 py-2 text-xs hover:bg-secondary">PKP Native XML</a>
             <a href={downloadXMLLink("crossref")} data-testid="export-crossref" className="block px-3 py-2 text-xs hover:bg-secondary">Crossref Deposit XML</a>
             <a href={docxLink} data-testid="export-docx" className="block px-3 py-2 text-xs hover:bg-secondary border-t border-border">DOCX (Word)</a>
-            <button onClick={() => { setTab("pdf"); setExportOpen(false); setTimeout(() => window.print(), 200); }} data-testid="export-pdf" className="w-full text-left block px-3 py-2 text-xs hover:bg-secondary">PDF (Print)</button>
+            <a href={api.downloadPDF(id)} data-testid="export-pdf" className="block px-3 py-2 text-xs hover:bg-secondary">PDF (Server-rendered)</a>
+            <button onClick={() => { setTab("pdf"); setExportOpen(false); setTimeout(() => window.print(), 200); }} data-testid="export-pdf-browser" className="w-full text-left block px-3 py-2 text-xs hover:bg-secondary border-t border-border">PDF via Browser Print</button>
           </div>
         )}
       </div>

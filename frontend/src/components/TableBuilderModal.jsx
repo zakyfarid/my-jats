@@ -7,12 +7,17 @@ export function TableBuilderModal({ open, onClose, onInsert }) {
   const [caption, setCaption] = React.useState("");
   const [label, setLabel] = React.useState("Table 1");
   const [cells, setCells] = React.useState(() => Array.from({ length: 3 }, () => Array.from({ length: 3 }, () => "")));
+  const [widths, setWidths] = React.useState(() => Array.from({ length: 3 }, () => ""));
 
   React.useEffect(() => {
     setCells((prev) => {
       const next = Array.from({ length: rows }, (_, r) =>
         Array.from({ length: cols }, (_, c) => (prev[r] && prev[r][c]) || "")
       );
+      return next;
+    });
+    setWidths((prev) => {
+      const next = Array.from({ length: cols }, (_, c) => prev[c] || "");
       return next;
     });
   }, [rows, cols]);
@@ -83,6 +88,26 @@ export function TableBuilderModal({ open, onClose, onInsert }) {
 
           <div className="border border-border rounded-sm overflow-auto">
             <table className="w-full">
+              <thead>
+                <tr className="bg-secondary/20">
+                  {Array.from({ length: cols }).map((_, c) => (
+                    <th key={c} className="border-b border-border p-1">
+                      <input
+                        value={widths[c] || ""}
+                        onChange={(e) => {
+                          const next = widths.slice();
+                          next[c] = e.target.value;
+                          setWidths(next);
+                        }}
+                        placeholder="auto"
+                        className="w-full px-1 py-0.5 text-[10px] bg-background text-center font-mono text-muted-foreground"
+                        data-testid={`table-width-${c}`}
+                        title={`Column ${c + 1} width (e.g. 20%, 3cm, auto)`}
+                      />
+                    </th>
+                  ))}
+                </tr>
+              </thead>
               <tbody>
                 {cells.map((row, r) => (
                   <tr key={r} className={r === 0 ? "bg-secondary/40" : ""}>
@@ -102,7 +127,7 @@ export function TableBuilderModal({ open, onClose, onInsert }) {
               </tbody>
             </table>
           </div>
-          <p className="text-[10px] text-muted-foreground">First row = header. Edit cells directly above.</p>
+          <p className="text-[10px] text-muted-foreground">First row = header (shaded). Top row = column width (e.g. <code>20%</code>, <code>3cm</code>, leave blank for auto).</p>
         </div>
         <div className="px-4 py-3 border-t border-border flex justify-end gap-2">
           <button onClick={onClose} className="text-xs px-3 py-1.5 border border-border rounded-sm hover:bg-secondary">Cancel</button>
