@@ -77,7 +77,14 @@ export default function Editor() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [article]);
 
-  // Autosave every 30s if dirty
+  // Re-format references when references list OR citation style changes
+  useEffect(() => {
+    if (!article) return;
+    const style = article.citation_style || "apa";
+    api.formatReferences(article.references || [], style)
+      .then((d) => setFormattedRefs(d.formatted))
+      .catch(() => {});
+  }, [article && article.citation_style, article && (article.references || []).length]);
   useEffect(() => {
     if (!article) return;
     clearInterval(autosaveTimer.current);
@@ -183,7 +190,7 @@ export default function Editor() {
   }
 
   const downloadXMLLink = (kind) => api.downloadXML(id, kind);
-  const docxLink = api.downloadDOCX(id, "apa");
+  const docxLink = api.downloadDOCX(id, article.citation_style || "apa");
 
   const headerRight = (
     <div className="flex items-center gap-2">
@@ -279,6 +286,8 @@ export default function Editor() {
               <ReferencesManager
                 references={article.references || []}
                 onChange={(refs) => onChange({ ...article, references: refs })}
+                citationStyle={article.citation_style || "apa"}
+                onCitationStyleChange={(s) => onChange({ ...article, citation_style: s })}
               />
             </div>
           )}

@@ -576,7 +576,15 @@ def generate_docx(article: Article, citation_style: str = "apa") -> bytes:
         _heading(doc, "References", level=1)
         formatted = format_references(article.references, citation_style)
         for line in formatted:
-            doc.add_paragraph(line, style="OpenJATS Reference")
+            p = doc.add_paragraph(style="OpenJATS Reference")
+            # Parse "*text*" segments as italic runs
+            segments = re.split(r"\*([^*]+)\*", line)
+            for idx, seg in enumerate(segments):
+                if seg == "":
+                    continue
+                run = p.add_run(seg)
+                if idx % 2 == 1:  # odd index = inside *…*
+                    run.italic = True
 
     buf = BytesIO()
     doc.save(buf)

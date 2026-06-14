@@ -372,15 +372,25 @@ export function PDFPreview({ article, formattedRefs = [], issueInfo }) {
             </div>
           )}
 
-          {/* References */}
+          {/* References — APA-style: no numbers, hanging indent, justified */}
           {formattedRefs.length > 0 && (
             <div className="mt-6">
               <h2 className="font-sans font-semibold text-base mb-3 uppercase tracking-wider">References</h2>
-              <ol className="text-xs space-y-1.5 list-decimal pl-5">
+              <div className="pdf-references" data-testid="pdf-references">
                 {formattedRefs.map((r, i) => (
-                  <li key={i}>{r}</li>
+                  <p
+                    key={i}
+                    data-testid={`pdf-ref-${i}`}
+                    dangerouslySetInnerHTML={{
+                      __html: r
+                        .replace(/&/g, "&amp;")
+                        .replace(/</g, "&lt;")
+                        .replace(/>/g, "&gt;")
+                        .replace(/\*([^*]+)\*/g, '<em>$1</em>'),
+                    }}
+                  />
                 ))}
-              </ol>
+              </div>
             </div>
           )}
         </div>

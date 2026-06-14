@@ -4,8 +4,7 @@ import { api } from "../lib/api";
 import { toast } from "sonner";
 import { PasteReferencesModal } from "./PasteReferencesModal";
 
-export function ReferencesManager({ references, onChange }) {
-  const [style, setStyle] = React.useState("apa");
+export function ReferencesManager({ references, onChange, citationStyle = "apa", onCitationStyleChange }) {
   const [formatted, setFormatted] = React.useState([]);
   const [importOpen, setImportOpen] = React.useState(false);
   const [importFormat, setImportFormat] = React.useState("ris");
@@ -18,11 +17,11 @@ export function ReferencesManager({ references, onChange }) {
       setFormatted([]);
       return;
     }
-    api.formatReferences(references, style).then((d) => {
+    api.formatReferences(references, citationStyle).then((d) => {
       if (!cancelled) setFormatted(d.formatted);
     }).catch(() => {});
     return () => { cancelled = true; };
-  }, [references, style]);
+  }, [references, citationStyle]);
 
   const addRef = () => {
     onChange([...references, { id: crypto.randomUUID(), type: "journal", authors: [], title: "", journal: "", year: "", volume: "", issue: "", pages: "", doi: "", url: "" }]);
@@ -83,8 +82,8 @@ export function ReferencesManager({ references, onChange }) {
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground uppercase tracking-wider">Citation Style</span>
           <select
-            value={style}
-            onChange={(e) => setStyle(e.target.value)}
+            value={citationStyle}
+            onChange={(e) => onCitationStyleChange && onCitationStyleChange(e.target.value)}
             data-testid="citation-style-select"
             className="bg-background border border-border rounded-sm px-2 py-1 text-xs"
           >
@@ -92,6 +91,7 @@ export function ReferencesManager({ references, onChange }) {
             <option value="harvard">Harvard</option>
             <option value="vancouver">Vancouver</option>
           </select>
+          <span className="text-[10px] text-muted-foreground italic ml-1">applied to PDF & DOCX export</span>
         </div>
         <div className="flex items-center gap-1">
           <button onClick={() => setPasteOpen(true)} data-testid="paste-refs-btn" className="text-xs flex items-center gap-1 px-2 py-1 border border-primary/40 text-primary rounded-sm hover:bg-primary/10">

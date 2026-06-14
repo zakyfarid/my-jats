@@ -27,7 +27,8 @@ export default function PrintView() {
         setArticle(art);
         setIssueInfo(info);
         if (art.references?.length) {
-          const f = await api.formatReferences(art.references, "apa");
+          const style = art.citation_style || "apa";
+          const f = await api.formatReferences(art.references, style);
           if (!cancelled) setFormattedRefs(f.formatted);
         }
         // Wait one extra tick for fonts & images

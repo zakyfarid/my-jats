@@ -105,6 +105,7 @@ class Article(BaseModel):
     received_date: str = ""
     revised_date: str = ""
     accepted_date: str = ""
+    citation_style: str = "apa"  # apa | harvard | vancouver
     journal: Journal = Field(default_factory=Journal)
     authors: List[Author] = Field(default_factory=list)
     abstract: Abstract = Field(default_factory=Abstract)

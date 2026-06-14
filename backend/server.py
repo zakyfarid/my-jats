@@ -207,12 +207,13 @@ async def get_crossref(article_id: str, download: bool = False):
 
 
 @api_router.get("/articles/{article_id}/docx")
-async def get_docx(article_id: str, style: str = "apa"):
+async def get_docx(article_id: str, style: Optional[str] = None):
     doc = await db.articles.find_one({"id": article_id}, {"_id": 0})
     if not doc:
         raise HTTPException(status_code=404, detail="Article not found")
     article = Article(**doc)
-    data = generate_docx(article, style)
+    effective_style = style or article.citation_style or "apa"
+    data = generate_docx(article, effective_style)
     return Response(
         content=data,
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",

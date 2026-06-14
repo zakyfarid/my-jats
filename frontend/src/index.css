@@ -106,6 +106,21 @@ code, pre, .font-mono {
 .xml-comment { color: #64748b; font-style: italic; }
 .xml-decl { color: #c084fc; }
 
+/* APA-style hanging indent reference list */
+.pdf-preview .pdf-references {
+  margin-top: 0.5rem;
+}
+.pdf-preview .pdf-references p {
+  text-align: justify;
+  hyphens: none;
+  word-break: normal;
+  overflow-wrap: break-word;
+  padding-left: 1.27cm;
+  text-indent: -1.27cm;
+  margin-bottom: 6px;
+  line-height: 1.5;
+  font-size: 0.85rem;
+}
 /* PDF Preview - print-like, single column */
 .pdf-preview {
   background: #f8fafc;
