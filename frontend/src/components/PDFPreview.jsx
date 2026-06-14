@@ -1,6 +1,74 @@
 import React from "react";
 import { Printer } from "lucide-react";
 
+function renderInline(text) {
+  // Citations [@key] => sup-style
+  return text
+    .replace(/\[@([^\]]+)\]/g, '<sup class="text-blue-700">[$1]</sup>')
+    .replace(/\[\^footnote:([^\]]*)\]/g, '<sup class="text-zinc-500">[fn: $1]</sup>');
+}
+
+function renderParagraph(line, key) {
+  const trimmed = line.trim();
+  if (!trimmed) return null;
+  if (trimmed.startsWith("### ")) {
+    return <h4 key={key} className="font-sans font-semibold text-sm mt-3 mb-1.5">{trimmed.slice(4)}</h4>;
+  }
+  if (trimmed.startsWith("## ")) {
+    return <h3 key={key} className="font-sans font-semibold text-base mt-4 mb-2">{trimmed.slice(3)}</h3>;
+  }
+  if (trimmed.startsWith("$$") && trimmed.endsWith("$$")) {
+    return (
+      <div key={key} className="text-center my-3 font-mono text-sm bg-zinc-100 py-2 rounded-sm">
+        {trimmed.slice(2, -2).trim()}
+      </div>
+    );
+  }
+  if (trimmed.startsWith("[Figure:")) {
+    return (
+      <div key={key} className="text-xs italic text-zinc-600 text-center my-2">
+        <strong>Figure.</strong> {trimmed.slice(8).replace(/\]$/, "").trim()}
+      </div>
+    );
+  }
+  // Table markdown (very simple): lines beginning with |
+  if (trimmed.startsWith("|")) {
+    return (
+      <pre key={key} className="text-[10px] bg-zinc-50 p-2 my-2 rounded-sm font-mono whitespace-pre-wrap">{trimmed}</pre>
+    );
+  }
+  return (
+    <p key={key} className="mb-2 indent-4" dangerouslySetInnerHTML={{ __html: renderInline(trimmed) }} />
+  );
+}
+
+function renderBody(body) {
+  if (!body) return null;
+  // Split into paragraphs and lines for headings
+  const paragraphs = body.split(/\n\n+/);
+  const out = [];
+  paragraphs.forEach((para, i) => {
+    // Within paragraph, headings on their own line should still be split
+    const lines = para.split("\n");
+    const buf = [];
+    lines.forEach((ln) => {
+      if (ln.trim().startsWith("## ") || ln.trim().startsWith("### ") || ln.trim().startsWith("[Figure:") || (ln.trim().startsWith("$$") && ln.trim().endsWith("$$"))) {
+        if (buf.length) {
+          out.push(renderParagraph(buf.join(" "), out.length));
+          buf.length = 0;
+        }
+        out.push(renderParagraph(ln, out.length));
+      } else {
+        buf.push(ln);
+      }
+    });
+    if (buf.length) {
+      out.push(renderParagraph(buf.join(" "), out.length));
+    }
+  });
+  return out;
+}
+
 export function PDFPreview({ article, formattedRefs = [] }) {
   const j = article.journal || {};
   const handlePrint = () => window.print();
@@ -71,7 +139,7 @@ export function PDFPreview({ article, formattedRefs = [] }) {
               s.b ? (
                 <React.Fragment key={i}>
                   <h2 className="pdf-section font-sans font-semibold text-base mt-4 mb-2 uppercase tracking-wider" style={{ color: "#1e293b" }}>{s.t}</h2>
-                  {s.b.split("\n\n").map((p, j2) => <p key={j2} className="mb-2 indent-4">{p}</p>)}
+                  {renderBody(s.b)}
                 </React.Fragment>
               ) : null
             )}

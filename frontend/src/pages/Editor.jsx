@@ -98,9 +98,11 @@ export default function Editor() {
         setDirty(false);
         setSavedAt(new Date());
       }
-      const fn = which === "pkp" ? api.getPKP : which === "crossref" ? api.getCrossref : api.getJATS;
+      const map = { xml: "jats", pkp: "pkp", crossref: "crossref" };
+      const key = map[which] || which;
+      const fn = key === "pkp" ? api.getPKP : key === "crossref" ? api.getCrossref : api.getJATS;
       const data = await fn(id);
-      setXml((x) => ({ ...x, [which]: data }));
+      setXml((x) => ({ ...x, [key]: data }));
     } catch (e) {
       toast.error("XML generation failed");
     }
