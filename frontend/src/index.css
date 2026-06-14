@@ -185,6 +185,46 @@ code, pre, .font-mono {
   }
 }
 
+/* Print-only styles: hide entire app chrome and show only the PDF article */
+@media print {
+  @page {
+    size: A4;
+    margin: 0;
+  }
+  html, body {
+    background: #ffffff !important;
+    color: #0f172a !important;
+  }
+  body * {
+    visibility: hidden !important;
+  }
+  .pdf-preview,
+  .pdf-preview * {
+    visibility: visible !important;
+  }
+  .pdf-preview {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 1.5cm 2cm !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+  }
+  .pdf-preview .pdf-figure { page-break-inside: avoid; }
+  .pdf-preview table.pdf-table { page-break-inside: avoid; }
+  .pdf-preview h1, .pdf-preview h2, .pdf-preview h3, .pdf-preview h4 {
+    page-break-after: avoid;
+  }
+  /* Hide print/toolbar control buttons and sidebars */
+  [data-no-print="true"] { display: none !important; }
+}
+
 /* Editor textarea uniform style */
 .editor-area {
   font-family: "Merriweather", Georgia, serif;
