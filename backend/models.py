@@ -24,6 +24,8 @@ class Journal(BaseModel):
     issue: str = ""
     year: str = ""
     doi_prefix: str = ""
+    logo: str = ""  # base64 data URL of journal logo
+    custom_header: str = ""  # free-text header line (e.g. journal tagline / website)
 
 
 class Author(BaseModel):

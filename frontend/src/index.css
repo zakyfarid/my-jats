@@ -106,23 +106,20 @@ code, pre, .font-mono {
 .xml-comment { color: #64748b; font-style: italic; }
 .xml-decl { color: #c084fc; }
 
-/* PDF Preview - print-like */
+/* PDF Preview - print-like, single column */
 .pdf-preview {
   background: #f8fafc;
   color: #0f172a;
   font-family: "Merriweather", Georgia, serif;
 }
 .pdf-preview .pdf-title { font-family: "IBM Plex Sans"; font-weight: 700; }
-.pdf-preview .pdf-cols {
-  column-count: 2;
-  column-gap: 2rem;
-  column-rule: 1px solid #e2e8f0;
+.pdf-preview .pdf-body {
   text-align: justify;
   hyphens: auto;
 }
-.pdf-preview h2.pdf-section {
-  break-after: avoid;
-  column-span: all;
+.pdf-preview .pdf-abstract {
+  text-align: justify;
+  hyphens: auto;
 }
 
 /* Editor textarea uniform style */

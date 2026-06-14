@@ -64,6 +64,61 @@ export function MetadataForm({ article, onChange, templates, onApplyTemplate }) 
         <Field label="DOI Prefix" testId="field-doi-prefix">
           <input value={J.doi_prefix || ""} onChange={(e) => set("journal.doi_prefix", e.target.value)} className={inputCls} placeholder="10.1234" data-testid="input-doi-prefix" />
         </Field>
+        <Field label="Custom Header Line" colSpan={2} testId="field-custom-header">
+          <input
+            value={J.custom_header || ""}
+            onChange={(e) => set("journal.custom_header", e.target.value)}
+            className={inputCls}
+            placeholder="e.g. https://journal.example.com  ·  An Open Access Journal"
+            data-testid="input-custom-header"
+          />
+        </Field>
+        <Field label="Journal Logo" colSpan={2} testId="field-journal-logo">
+          <div className="flex items-center gap-3">
+            {J.logo && (
+              <img
+                src={J.logo}
+                alt="Journal logo preview"
+                className="h-12 w-auto object-contain border border-border rounded-sm bg-white p-1"
+                data-testid="journal-logo-preview"
+              />
+            )}
+            <label
+              className="text-xs flex items-center gap-1 px-3 py-1.5 border border-border rounded-sm hover:bg-secondary cursor-pointer"
+              data-testid="journal-logo-upload-label"
+            >
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                className="hidden"
+                data-testid="journal-logo-input"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  if (file.size > 1_500_000) {
+                    alert("Logo too large (max 1.5MB). Resize first.");
+                    return;
+                  }
+                  const reader = new FileReader();
+                  reader.onload = () => set("journal.logo", reader.result);
+                  reader.readAsDataURL(file);
+                }}
+              />
+              {J.logo ? "Replace Logo" : "Upload Logo"}
+            </label>
+            {J.logo && (
+              <button
+                type="button"
+                onClick={() => set("journal.logo", "")}
+                data-testid="journal-logo-remove"
+                className="text-xs px-2 py-1.5 border border-border rounded-sm text-destructive hover:bg-secondary"
+              >
+                Remove
+              </button>
+            )}
+            <span className="text-[10px] text-muted-foreground">PNG / JPG / SVG · max 1.5 MB</span>
+          </div>
+        </Field>
       </Section>
 
       <Section title="Article Metadata">

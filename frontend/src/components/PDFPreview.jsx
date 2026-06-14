@@ -83,9 +83,32 @@ export function PDFPreview({ article, formattedRefs = [] }) {
       </div>
       <div className="flex-1 overflow-auto p-8 bg-zinc-800">
         <div className="pdf-preview mx-auto max-w-4xl shadow-xl rounded-sm p-12" data-testid="pdf-content">
-          {/* Header */}
+          {/* Custom Journal Header with Logo */}
+          {(j.logo || j.custom_header || j.title) && (
+            <div className="border-b-2 border-zinc-700 pb-4 mb-6 flex items-center gap-4" data-testid="pdf-custom-header">
+              {j.logo && (
+                <img
+                  src={j.logo}
+                  alt="Journal logo"
+                  className="h-16 w-auto object-contain shrink-0"
+                  data-testid="pdf-journal-logo"
+                />
+              )}
+              <div className="flex-1 min-w-0">
+                {j.title && <div className="font-sans font-bold text-lg leading-tight" style={{ color: "#0f172a" }}>{j.title}</div>}
+                {j.custom_header && <div className="text-xs text-zinc-600 mt-0.5">{j.custom_header}</div>}
+                <div className="text-[11px] text-zinc-500 mt-1 font-mono">
+                  {j.issn && <span>ISSN: {j.issn}</span>}
+                  {j.eissn && <span> · e-ISSN: {j.eissn}</span>}
+                  {j.publisher && <span> · {j.publisher}</span>}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Volume / DOI strip */}
           <div className="border-b border-zinc-300 pb-3 mb-6 text-xs flex justify-between text-zinc-600">
-            <span>{j.title || "Journal Title"} · Vol. {j.volume || "—"}, No. {j.issue || "—"} ({j.year || "—"})</span>
+            <span>Vol. {j.volume || "—"}, No. {j.issue || "—"} ({j.year || "—"})</span>
             <span>doi: {article.doi || "—"}</span>
           </div>
 
@@ -114,11 +137,11 @@ export function PDFPreview({ article, formattedRefs = [] }) {
             )}
           </div>
 
-          {/* Abstract */}
+          {/* Abstract (justified) */}
           {article.abstract?.english && (
             <div className="bg-zinc-50 border-l-4 border-zinc-400 p-4 mb-6 text-sm">
               <div className="font-sans font-bold uppercase tracking-wider text-xs mb-2">Abstract</div>
-              <p className="leading-relaxed">{article.abstract.english}</p>
+              <p className="leading-relaxed pdf-abstract">{article.abstract.english}</p>
               {article.keywords?.length > 0 && (
                 <div className="mt-3 text-xs">
                   <strong>Keywords:</strong> {article.keywords.join(", ")}
@@ -134,8 +157,8 @@ export function PDFPreview({ article, formattedRefs = [] }) {
             </div>
           )}
 
-          {/* Two column body */}
-          <div className="pdf-cols text-sm leading-relaxed">
+          {/* Single column body */}
+          <div className="pdf-body text-sm leading-relaxed">
             {[
               { t: "Introduction", b: article.sections?.introduction },
               { t: "Methods", b: article.sections?.methods },
