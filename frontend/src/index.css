@@ -121,11 +121,20 @@ code, pre, .font-mono {
   line-height: 1.5;
   font-size: 0.85rem;
 }
-/* PDF Preview - print-like, single column */
+/* PDF Preview - print-like, single column.
+   Sized as A4 portrait so screen preview matches printed/exported PDF exactly. */
 .pdf-preview {
   background: #f8fafc;
   color: #0f172a;
   font-family: "Merriweather", Georgia, serif;
+  width: 210mm;
+  max-width: 210mm;
+  min-height: 297mm;
+  margin: 0 auto;
+  padding: 2.5cm 2.2cm 2.5cm 2.2cm;
+  box-sizing: border-box;
+  background: #ffffff;
+  color: #0f172a;
 }
 .pdf-preview .pdf-title { font-family: "IBM Plex Sans"; font-weight: 700; }
 .pdf-preview .pdf-body {

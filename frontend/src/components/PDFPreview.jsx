@@ -227,7 +227,7 @@ export function PDFPreview({ article, formattedRefs = [], issueInfo }) {
         </button>
       </div>
       <div className="flex-1 overflow-auto p-8 bg-zinc-800">
-        <div className="pdf-preview mx-auto max-w-4xl shadow-xl rounded-sm" style={{ padding: "3.5rem 3rem" }} data-testid="pdf-content">
+        <div className="pdf-preview shadow-xl rounded-sm" data-testid="pdf-content">
           {/* Custom Journal Header with Logo */}
           {(j.logo || j.custom_header || j.title) && (
             <div className="border-b-2 border-zinc-700 pb-4 mb-6 flex items-center gap-4" data-testid="pdf-custom-header">
