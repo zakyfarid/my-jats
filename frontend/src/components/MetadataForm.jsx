@@ -95,8 +95,8 @@ export function MetadataForm({ article, onChange, templates, onApplyTemplate }) 
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (!file) return;
-                  if (file.size > 1_500_000) {
-                    alert("Logo too large (max 1.5MB). Resize first.");
+                if (file.size > 3_000_000) {
+                    alert("Logo too large (max 3 MB). Resize first.");
                     return;
                   }
                   const reader = new FileReader();
@@ -116,7 +116,7 @@ export function MetadataForm({ article, onChange, templates, onApplyTemplate }) 
                 Remove
               </button>
             )}
-            <span className="text-[10px] text-muted-foreground">PNG / JPG / SVG · max 1.5 MB</span>
+            <span className="text-[10px] text-muted-foreground">PNG / JPG / SVG · max 3 MB · displayed in PDF header & DOCX page header (auto-sized to ~2cm tall)</span>
           </div>
         </Field>
       </Section>

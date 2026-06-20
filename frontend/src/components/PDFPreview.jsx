@@ -1,6 +1,38 @@
 import React from "react";
 import { Printer } from "lucide-react";
 
+// Language-aware labels — EN default, switch to ID when article.language === "id"
+const LABELS = {
+  en: {
+    abstract: "Abstract", keywords: "Keywords",
+    received: "Received", revised: "Revised", accepted: "Accepted",
+    introduction: "Introduction", methods: "Methods", results: "Results",
+    discussion: "Discussion", conclusion: "Conclusion",
+    acknowledgement: "Acknowledgements", funding: "Funding",
+    conflict_of_interest: "Conflict of Interest",
+    data_availability: "Data Availability",
+    author_contributions: "Author Contributions",
+    ethical_approval: "Ethical Approval",
+    refs: "References",
+    corresp_email: "Corresponding author",
+    email: "Email",
+  },
+  id: {
+    abstract: "Abstrak", keywords: "Kata Kunci",
+    received: "Diterima", revised: "Direvisi", accepted: "Disetujui",
+    introduction: "Pendahuluan", methods: "Metode", results: "Hasil",
+    discussion: "Pembahasan", conclusion: "Kesimpulan",
+    acknowledgement: "Ucapan Terima Kasih", funding: "Pendanaan",
+    conflict_of_interest: "Konflik Kepentingan",
+    data_availability: "Ketersediaan Data",
+    author_contributions: "Kontribusi Penulis",
+    ethical_approval: "Persetujuan Etik",
+    refs: "Daftar Pustaka",
+    corresp_email: "Penulis korespondensi",
+    email: "Email",
+  },
+};
+
 // License code → display info
 const LICENSES = {
   "CC-BY 4.0": { name: "CC BY 4.0", url: "https://creativecommons.org/licenses/by/4.0/", icon: "BY" },
@@ -249,6 +281,7 @@ function renderBlocks(body, figuresMap, keyPrefix = "") {
 
 export function PDFPreview({ article, formattedRefs = [], issueInfo }) {
   const j = article.journal || {};
+  const T = LABELS[article.language] || LABELS.en;
   const handlePrint = () => window.print();
   const figuresMap = React.useMemo(() => {
     const m = {};
@@ -334,47 +367,54 @@ export function PDFPreview({ article, formattedRefs = [], issueInfo }) {
                 <div key={`aff-${i}`}>
                   <sup>{i + 1}</sup> {a.affiliation}
                   {a.country ? `, ${a.country}` : ""}
+                  {a.email ? <span className="not-italic text-zinc-700"> · {a.email}</span> : null}
                 </div>
               ) : null
             )}
             {(article.authors || []).find((a) => a.corresponding) && (
-              <div className="mt-1">
-                * Corresponding author: {(article.authors || []).find((a) => a.corresponding)?.email}
+              <div className="mt-1 not-italic">
+                * {T.corresp_email}: <a href={`mailto:${(article.authors || []).find((a) => a.corresponding)?.email}`} className="text-zinc-700 underline">{(article.authors || []).find((a) => a.corresponding)?.email}</a>
               </div>
             )}
           </div>
 
-          {/* Abstract (justified, no hyphenation) */}
+          {/* Abstract — two-column layout: left = keywords + dates, right = abstract text */}
           {article.abstract?.english && (
             <div className="bg-zinc-50 border-l-4 border-zinc-400 p-4 mb-6 text-sm">
-              <div className="font-sans font-bold uppercase tracking-wider text-xs mb-2">Abstract</div>
-              <p className="leading-relaxed pdf-abstract">{article.abstract.english}</p>
-              {article.keywords?.length > 0 && (
-                <div className="mt-3 text-xs">
-                  <strong>Keywords:</strong> {article.keywords.join(", ")}
+              <div className="grid grid-cols-12 gap-5">
+                <aside className="col-span-4 text-xs space-y-3 border-r border-zinc-200 pr-4" data-testid="pdf-abstract-sidebar">
+                  {article.keywords?.length > 0 && (
+                    <div>
+                      <div className="font-sans font-bold uppercase tracking-wider text-[10px] text-zinc-600 mb-1">{T.keywords}</div>
+                      <div className="italic">{article.keywords.join(", ")}</div>
+                    </div>
+                  )}
+                  {(article.received_date || article.revised_date || article.accepted_date) && (
+                    <div className="space-y-1 not-italic" data-testid="pdf-history-dates">
+                      <div className="font-sans font-bold uppercase tracking-wider text-[10px] text-zinc-600 mb-1">Article History</div>
+                      {article.received_date && (
+                        <div><strong>{T.received}:</strong> {article.received_date}</div>
+                      )}
+                      {article.revised_date && (
+                        <div><strong>{T.revised}:</strong> {article.revised_date}</div>
+                      )}
+                      {article.accepted_date && (
+                        <div><strong>{T.accepted}:</strong> {article.accepted_date}</div>
+                      )}
+                    </div>
+                  )}
+                </aside>
+                <div className="col-span-8">
+                  <div className="font-sans font-bold uppercase tracking-wider text-xs mb-2">{T.abstract}</div>
+                  <p className="leading-relaxed pdf-abstract">{article.abstract.english}</p>
+                  {article.abstract.indonesian && article.language !== "id" && (
+                    <>
+                      <div className="font-sans font-bold uppercase tracking-wider text-xs mt-3 mb-2">Abstrak</div>
+                      <p className="leading-relaxed pdf-abstract">{article.abstract.indonesian}</p>
+                    </>
+                  )}
                 </div>
-              )}
-              {(article.received_date || article.revised_date || article.accepted_date) && (
-                <div className="mt-2 text-xs text-zinc-600 font-sans" data-testid="pdf-history-dates">
-                  {article.received_date && (
-                    <span>
-                      <strong>Received:</strong> {article.received_date}{" "}
-                    </span>
-                  )}
-                  {article.revised_date && (
-                    <span>
-                      {" "}
-                      · <strong>Revised:</strong> {article.revised_date}{" "}
-                    </span>
-                  )}
-                  {article.accepted_date && (
-                    <span>
-                      {" "}
-                      · <strong>Accepted:</strong> {article.accepted_date}
-                    </span>
-                  )}
-                </div>
-              )}
+              </div>
             </div>
           )}
 
@@ -400,11 +440,11 @@ export function PDFPreview({ article, formattedRefs = [], issueInfo }) {
           {/* Single column body */}
           <div className="pdf-body text-sm leading-relaxed">
             {[
-              { t: "Introduction", b: article.sections?.introduction },
-              { t: "Methods", b: article.sections?.methods },
-              { t: "Results", b: article.sections?.results },
-              { t: "Discussion", b: article.sections?.discussion },
-              { t: "Conclusion", b: article.sections?.conclusion },
+              { t: T.introduction, b: article.sections?.introduction },
+              { t: T.methods, b: article.sections?.methods },
+              { t: T.results, b: article.sections?.results },
+              { t: T.discussion, b: article.sections?.discussion },
+              { t: T.conclusion, b: article.sections?.conclusion },
             ].map((s, i) =>
               s.b ? (
                 <React.Fragment key={i}>
@@ -423,24 +463,24 @@ export function PDFPreview({ article, formattedRefs = [], issueInfo }) {
           {/* Back matter */}
           {article.sections?.acknowledgement && (
             <div className="mt-6 text-sm border-t border-zinc-300 pt-4">
-              <strong>Acknowledgements.</strong> {article.sections.acknowledgement}
+              <strong>{T.acknowledgement}.</strong> {article.sections.acknowledgement}
             </div>
           )}
           {article.sections?.funding && (
             <div className="mt-2 text-sm">
-              <strong>Funding.</strong> {article.sections.funding}
+              <strong>{T.funding}.</strong> {article.sections.funding}
             </div>
           )}
           {article.sections?.conflict_of_interest && (
             <div className="mt-2 text-sm">
-              <strong>Conflict of Interest.</strong> {article.sections.conflict_of_interest}
+              <strong>{T.conflict_of_interest}.</strong> {article.sections.conflict_of_interest}
             </div>
           )}
 
           {/* References — APA-style: no numbers, hanging indent, justified */}
           {formattedRefs.length > 0 && (
             <div className="mt-6">
-              <h2 className="font-sans font-semibold text-base mb-3 uppercase tracking-wider">References</h2>
+              <h2 className="font-sans font-semibold text-base mb-3 uppercase tracking-wider">{T.refs}</h2>
               <div className="pdf-references" data-testid="pdf-references">
                 {formattedRefs.map((r, i) => (
                   <p

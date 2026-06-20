@@ -146,23 +146,23 @@ def _build_page_header(doc: Document, j: Journal, article: Article):
     for p in list(header.paragraphs):
         p.clear()
 
-    # First paragraph: logo + journal title (two-column-ish via tab)
+    # First paragraph: logo + journal title
     p1 = header.paragraphs[0]
     p1.alignment = WD_ALIGN_PARAGRAPH.LEFT
-    # Embed raster logo
+    # Embed raster logo (larger height for prominence)
     if j.logo and "svg" not in (j.logo or "").lower():
         img_bytes = _decode_data_url(j.logo)
         if img_bytes:
             run = p1.add_run()
             try:
-                run.add_picture(BytesIO(img_bytes), height=Cm(1.2))
+                run.add_picture(BytesIO(img_bytes), height=Cm(2.0))
             except Exception:
                 pass
-            p1.add_run("  ")  # spacing after logo
+            p1.add_run("   ")  # extra spacing after logo
 
     title_run = p1.add_run(j.title or "")
     title_run.bold = True
-    title_run.font.size = Pt(10)
+    title_run.font.size = Pt(12)
     title_run.font.name = "Calibri"
     title_run.font.color.rgb = RGBColor(0x1E, 0x29, 0x3B)
 
@@ -270,6 +270,35 @@ def _add_list(doc: Document, items: list, ordered: bool, font_family: str = "Tim
 def _add_page_break(doc: Document):
     p = doc.add_paragraph()
     p.add_run().add_break(WD_BREAK.PAGE)
+
+
+# Language-aware section labels
+LABELS = {
+    "en": {
+        "abstract": "Abstract", "keywords": "Keywords",
+        "received": "Received", "revised": "Revised", "accepted": "Disetujui" if False else "Accepted",
+        "introduction": "Introduction", "methods": "Methods", "results": "Results",
+        "discussion": "Discussion", "conclusion": "Conclusion",
+        "acknowledgement": "Acknowledgements", "funding": "Funding",
+        "conflict_of_interest": "Conflict of Interest",
+        "data_availability": "Data Availability",
+        "author_contributions": "Author Contributions",
+        "ethical_approval": "Ethical Approval",
+        "refs": "References", "corresp": "Corresponding author", "history": "Article History",
+    },
+    "id": {
+        "abstract": "Abstrak", "keywords": "Kata Kunci",
+        "received": "Diterima", "revised": "Direvisi", "accepted": "Disetujui",
+        "introduction": "Pendahuluan", "methods": "Metode", "results": "Hasil",
+        "discussion": "Pembahasan", "conclusion": "Kesimpulan",
+        "acknowledgement": "Ucapan Terima Kasih", "funding": "Pendanaan",
+        "conflict_of_interest": "Konflik Kepentingan",
+        "data_availability": "Ketersediaan Data",
+        "author_contributions": "Kontribusi Penulis",
+        "ethical_approval": "Persetujuan Etik",
+        "refs": "Daftar Pustaka", "corresp": "Penulis korespondensi", "history": "Riwayat Artikel",
+    },
+}
 
 
 def _set_paragraph_shading(paragraph, color_hex: str):
@@ -582,61 +611,100 @@ def generate_docx(article: Article, citation_style: str = "apa") -> bytes:
         names_run.font.name = "Times New Roman"
         names_run.bold = True
 
+    # (Author affiliations + emails block now rendered in main block below)
+
+    figures_map = {f.id: f for f in (article.figures or [])}
+    font_family = article.font_family or "Times New Roman"
+    T = LABELS.get(article.language) or LABELS["en"]
+
+    # Author affiliations + emails block
+    if article.authors:
         for i, a in enumerate(article.authors, 1):
-            if a.affiliation:
+            if a.affiliation or a.email:
                 af = doc.add_paragraph()
                 af.alignment = WD_ALIGN_PARAGRAPH.LEFT
-                afr = af.add_run(f"{i}. {a.affiliation}{(', ' + a.country) if a.country else ''}")
+                parts = []
+                if a.affiliation:
+                    parts.append(f"{a.affiliation}{(', ' + a.country) if a.country else ''}")
+                if a.email:
+                    parts.append(a.email)
+                afr = af.add_run(f"{i}. " + " · ".join(parts))
                 afr.italic = True
                 afr.font.size = Pt(9)
                 afr.font.name = "Times New Roman"
                 af.paragraph_format.space_after = Pt(0)
 
-    figures_map = {f.id: f for f in (article.figures or [])}
-    font_family = article.font_family or "Times New Roman"
+    corresponding = next((a for a in (article.authors or []) if a.corresponding), None)
+    if corresponding and corresponding.email:
+        cp = doc.add_paragraph()
+        cp.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        cr = cp.add_run(f"* {T['corresp']}: {corresponding.email}")
+        cr.italic = True
+        cr.font.size = Pt(9)
+        cr.font.name = "Times New Roman"
+        cp.paragraph_format.space_after = Pt(8)
 
-    # Abstract — styled with shading + left border (matches PDF preview)
+    # Abstract — TWO COLUMN layout (Word table 1 row x 2 cols)
     if article.abstract.english:
-        # ABSTRACT title
-        ah = doc.add_paragraph(style="OpenJATS H2")
-        ah_run = ah.add_run("ABSTRACT")
-        ah_run.font.size = Pt(10)
-        ah_run.bold = True
-        _set_paragraph_shading(ah, "F1F5F9")
-        _set_paragraph_left_border(ah, "475569", 24)
-        # Body
-        ap = doc.add_paragraph(style="OpenJATS Abstract")
-        _add_inline_runs(ap, article.abstract.english, base_font=font_family, base_size=10)
-        _set_paragraph_shading(ap, "F1F5F9")
-        _set_paragraph_left_border(ap, "475569", 24)
+        abs_table = doc.add_table(rows=1, cols=2)
+        abs_table.autofit = False
+        abs_table.alignment = WD_TABLE_ALIGNMENT.CENTER
+        left_cell, right_cell = abs_table.rows[0].cells
+        left_cell.width = Cm(5.5)
+        right_cell.width = Cm(10.5)
+        _shade_cell(left_cell, "F1F5F9")
+        _shade_cell(right_cell, "F1F5F9")
 
-    if article.keywords:
-        kp = doc.add_paragraph(style="OpenJATS Abstract")
-        kp.paragraph_format.first_line_indent = Cm(0)
-        kr = kp.add_run("Keywords: ")
-        kr.bold = True
-        kr2 = kp.add_run(", ".join(article.keywords))
-        kr2.italic = True
-        _set_paragraph_shading(kp, "F1F5F9")
-        _set_paragraph_left_border(kp, "475569", 24)
+        # LEFT cell: Keywords + Article History
+        left_p = left_cell.paragraphs[0]
+        if article.keywords:
+            r1 = left_p.add_run(T["keywords"].upper())
+            r1.bold = True
+            r1.font.size = Pt(8)
+            r1.font.name = "Calibri"
+            left_p.add_run("\n")
+            r2 = left_p.add_run(", ".join(article.keywords))
+            r2.italic = True
+            r2.font.size = Pt(9)
+            r2.font.name = font_family
 
-    history_bits = []
-    if article.received_date:
-        history_bits.append(f"Received: {article.received_date}")
-    if article.revised_date:
-        history_bits.append(f"Revised: {article.revised_date}")
-    if article.accepted_date:
-        history_bits.append(f"Accepted: {article.accepted_date}")
-    if history_bits:
-        hp = doc.add_paragraph()
-        hp.alignment = WD_ALIGN_PARAGRAPH.LEFT
-        hr = hp.add_run(" · ".join(history_bits))
-        hr.italic = True
-        hr.font.size = Pt(9)
-        hr.font.name = "Calibri"
-        hp.paragraph_format.space_after = Pt(6)
-        _set_paragraph_shading(hp, "F1F5F9")
-        _set_paragraph_left_border(hp, "475569", 24)
+        if article.received_date or article.revised_date or article.accepted_date:
+            sp = left_cell.add_paragraph()
+            hh = sp.add_run(T["history"].upper())
+            hh.bold = True
+            hh.font.size = Pt(8)
+            hh.font.name = "Calibri"
+            if article.received_date:
+                p2 = left_cell.add_paragraph()
+                rb = p2.add_run(f"{T['received']}: ")
+                rb.bold = True; rb.font.size = Pt(9); rb.font.name = "Calibri"
+                rv = p2.add_run(article.received_date)
+                rv.font.size = Pt(9); rv.font.name = "Calibri"
+                p2.paragraph_format.space_after = Pt(0)
+            if article.revised_date:
+                p2 = left_cell.add_paragraph()
+                rb = p2.add_run(f"{T['revised']}: "); rb.bold = True; rb.font.size = Pt(9); rb.font.name = "Calibri"
+                rv = p2.add_run(article.revised_date); rv.font.size = Pt(9); rv.font.name = "Calibri"
+                p2.paragraph_format.space_after = Pt(0)
+            if article.accepted_date:
+                p2 = left_cell.add_paragraph()
+                rb = p2.add_run(f"{T['accepted']}: "); rb.bold = True; rb.font.size = Pt(9); rb.font.name = "Calibri"
+                rv = p2.add_run(article.accepted_date); rv.font.size = Pt(9); rv.font.name = "Calibri"
+                p2.paragraph_format.space_after = Pt(0)
+
+        # RIGHT cell: Abstract title + body
+        right_p = right_cell.paragraphs[0]
+        h = right_p.add_run(T["abstract"].upper())
+        h.bold = True
+        h.font.size = Pt(10)
+        h.font.name = "Calibri"
+        body_p = right_cell.add_paragraph()
+        body_p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+        _suppress_hyphens(body_p)
+        body_p.paragraph_format.line_spacing = 1.15
+        _add_inline_runs(body_p, article.abstract.english, base_font=font_family, base_size=10)
+
+        doc.add_paragraph().paragraph_format.space_after = Pt(2)
 
     # Creative Commons License block — matches PDF "license-banner"
     lic_map = {
@@ -673,16 +741,16 @@ def generate_docx(article: Article, citation_style: str = "apa") -> bytes:
         _set_paragraph_shading(lp, "F1F5F9")
         _set_paragraph_left_border(lp, "0EA5E9", 24)
 
-    if article.abstract.indonesian:
+    if article.abstract.indonesian and article.language != "id":
         _heading(doc, "Abstrak", level=1)
         _add_body_para(doc, article.abstract.indonesian, style="OpenJATS Abstract", indent=False, font_family=font_family)
 
     sec_map = [
-        ("Introduction", article.sections.introduction),
-        ("Methods", article.sections.methods),
-        ("Results", article.sections.results),
-        ("Discussion", article.sections.discussion),
-        ("Conclusion", article.sections.conclusion),
+        (T["introduction"], article.sections.introduction),
+        (T["methods"], article.sections.methods),
+        (T["results"], article.sections.results),
+        (T["discussion"], article.sections.discussion),
+        (T["conclusion"], article.sections.conclusion),
     ]
     for title, body in sec_map:
         if body and body.strip():
@@ -690,12 +758,12 @@ def generate_docx(article: Article, citation_style: str = "apa") -> bytes:
             _render_body(doc, body, figures_map, font_family=font_family)
 
     back_map = [
-        ("Acknowledgements", article.sections.acknowledgement),
-        ("Funding", article.sections.funding),
-        ("Conflict of Interest", article.sections.conflict_of_interest),
-        ("Data Availability", article.sections.data_availability),
-        ("Author Contributions", article.sections.author_contributions),
-        ("Ethical Approval", article.sections.ethical_approval),
+        (T["acknowledgement"], article.sections.acknowledgement),
+        (T["funding"], article.sections.funding),
+        (T["conflict_of_interest"], article.sections.conflict_of_interest),
+        (T["data_availability"], article.sections.data_availability),
+        (T["author_contributions"], article.sections.author_contributions),
+        (T["ethical_approval"], article.sections.ethical_approval),
     ]
     for title, body in back_map:
         if body and body.strip():
@@ -703,7 +771,7 @@ def generate_docx(article: Article, citation_style: str = "apa") -> bytes:
             _add_body_para(doc, body, style="OpenJATS Body", indent=False, font_family=font_family)
 
     if article.references:
-        _heading(doc, "References", level=1)
+        _heading(doc, T["refs"], level=1)
         formatted = format_references(article.references, citation_style)
         for line in formatted:
             p = doc.add_paragraph(style="OpenJATS Reference")
