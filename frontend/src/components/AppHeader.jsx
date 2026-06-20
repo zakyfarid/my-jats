@@ -1,6 +1,7 @@
 import React from "react";
-import { Link, useLocation } from "react-router-dom";
-import { FileText, BookOpen, Layout, Moon, Sun } from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { FileText, BookOpen, Layout, Moon, Sun, LogOut, Shield, Users } from "lucide-react";
+import { useAuth } from "../lib/auth";
 
 const NavLink = ({ to, children, icon: Icon, testId }) => {
   const location = useLocation();
@@ -21,6 +22,8 @@ const NavLink = ({ to, children, icon: Icon, testId }) => {
 
 export const AppHeader = ({ right, breadcrumb }) => {
   const [theme, setTheme] = React.useState(() => localStorage.getItem("ojats-theme") || "dark");
+  const auth = useAuth();
+  const navigate = useNavigate();
   React.useEffect(() => {
     const root = document.documentElement;
     if (theme === "light") {
@@ -32,6 +35,11 @@ export const AppHeader = ({ right, breadcrumb }) => {
     }
     localStorage.setItem("ojats-theme", theme);
   }, [theme]);
+
+  const handleLogout = () => {
+    auth.logout();
+    navigate("/login");
+  };
 
   return (
     <header
@@ -57,6 +65,11 @@ export const AppHeader = ({ right, breadcrumb }) => {
           <NavLink to="/templates" icon={BookOpen} testId="nav-templates">
             Templates
           </NavLink>
+          {auth.user?.role === "super_admin" && (
+            <NavLink to="/admins" icon={Users} testId="nav-admins">
+              Admins
+            </NavLink>
+          )}
         </nav>
         {breadcrumb && (
           <div className="flex items-center gap-2 text-xs text-muted-foreground border-l border-border pl-4 ml-2">
@@ -66,6 +79,25 @@ export const AppHeader = ({ right, breadcrumb }) => {
       </div>
       <div className="flex items-center gap-3">
         {right}
+        {auth.user && (
+          <div className="flex items-center gap-2 border-l border-border pl-3 ml-1">
+            <div className="text-right" data-testid="header-user">
+              <div className="text-xs font-medium leading-tight">{auth.user.name || auth.user.email}</div>
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground flex items-center gap-1 justify-end">
+                {auth.user.role === "super_admin" && <Shield className="h-3 w-3" />}
+                {auth.user.role.replace("_", " ")}
+              </div>
+            </div>
+            <button
+              data-testid="logout-btn"
+              onClick={handleLogout}
+              className="h-8 w-8 flex items-center justify-center rounded-sm hover:bg-secondary text-muted-foreground hover:text-foreground"
+              title="Logout"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
+          </div>
+        )}
         <button
           data-testid="theme-toggle"
           onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}

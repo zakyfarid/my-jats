@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AppHeader } from "../components/AppHeader";
 import { api } from "../lib/api";
-import { Plus, Search, FileText, Calendar, Hash } from "lucide-react";
+import { Plus, Search, FileText, Calendar, Hash, Upload, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 const STATUS_OPTIONS = [
@@ -75,6 +75,36 @@ export default function Dashboard() {
     }
   };
 
+  const fileInputRef = useRef(null);
+  const [uploading, setUploading] = useState(false);
+
+  const handleUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const art = await api.uploadDocx(file);
+      toast.success(`Imported "${art.title?.slice(0, 50) || 'article'}"`);
+      navigate(`/editor/${art.id}`);
+    } catch (err) {
+      toast.error(err.response?.data?.detail || "Upload failed");
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  };
+
+  const handleDelete = async (id, title) => {
+    if (!window.confirm(`Delete article "${title}"? This cannot be undone.`)) return;
+    try {
+      await api.deleteArticle(id);
+      toast.success("Article deleted");
+      load();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || "Delete failed");
+    }
+  };
+
   return (
     <div className="h-screen flex flex-col bg-background">
       <AppHeader />
@@ -92,6 +122,7 @@ export default function Dashboard() {
                 Layout, validate, and export scholarly articles to JATS, PKP, Crossref XML.
               </p>
             </div>
+            <div className="flex items-center gap-2">
             <button
               data-testid="new-article-btn"
               onClick={createNew}
@@ -100,6 +131,25 @@ export default function Dashboard() {
               <Plus className="h-4 w-4" />
               New Article
             </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              onChange={handleUpload}
+              className="hidden"
+              data-testid="upload-docx-input"
+            />
+            <button
+              data-testid="upload-docx-btn"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="flex items-center gap-2 border border-border px-3 py-2 text-sm rounded-sm hover:bg-secondary disabled:opacity-50"
+              title="Upload DOCX — auto-detect title & IMRAD sections"
+            >
+              <Upload className="h-4 w-4" />
+              {uploading ? "Uploading…" : "Upload DOCX"}
+            </button>
+            </div>
           </div>
 
           {/* Filters bar */}
@@ -154,14 +204,15 @@ export default function Dashboard() {
 
           {/* Articles table */}
           <div className="border border-border rounded-sm bg-card overflow-hidden">
-            <div className="grid grid-cols-12 gap-4 px-4 py-2.5 text-[10px] uppercase tracking-[0.15em] text-muted-foreground border-b border-border bg-secondary/30">
-              <div className="col-span-5">Title</div>
+              <div className="grid grid-cols-12 gap-4 px-4 py-2.5 text-[10px] uppercase tracking-[0.15em] text-muted-foreground border-b border-border bg-secondary/30">
+              <div className="col-span-4">Title</div>
               <div className="col-span-2">Authors</div>
               <div className="col-span-1">Status</div>
               <div className="col-span-1">Vol</div>
               <div className="col-span-1">Issue</div>
               <div className="col-span-1">Year</div>
               <div className="col-span-1">Updated</div>
+              <div className="col-span-1 text-right">Actions</div>
             </div>
 
             {loading ? (
@@ -176,20 +227,19 @@ export default function Dashboard() {
             ) : (
               <div data-testid="articles-list">
                 {articles.map((a) => (
-                  <Link
+                  <div
                     key={a.id}
-                    to={`/editor/${a.id}`}
                     data-testid={`article-row-${a.id}`}
                     className="grid grid-cols-12 gap-4 px-4 py-3 text-sm border-b border-border last:border-0 hover:bg-secondary/30 transition-colors items-center"
                   >
-                    <div className="col-span-5">
+                    <Link to={`/editor/${a.id}`} className="col-span-4 min-w-0">
                       <div className="font-medium truncate" data-testid={`article-title-${a.id}`}>
                         {a.title}
                       </div>
                       {a.journal_title && (
                         <div className="text-xs text-muted-foreground truncate mt-0.5">{a.journal_title}</div>
                       )}
-                    </div>
+                    </Link>
                     <div className="col-span-2 text-xs text-muted-foreground truncate">
                       {a.authors.length ? a.authors.slice(0, 2).join(", ") + (a.authors.length > 2 ? ` +${a.authors.length - 2}` : "") : "—"}
                     </div>
@@ -202,7 +252,17 @@ export default function Dashboard() {
                     <div className="col-span-1 text-xs text-muted-foreground">
                       {a.updated_at ? new Date(a.updated_at).toLocaleDateString() : "—"}
                     </div>
-                  </Link>
+                    <div className="col-span-1 text-right">
+                      <button
+                        onClick={() => handleDelete(a.id, a.title)}
+                        data-testid={`delete-article-${a.id}`}
+                        className="text-destructive hover:text-destructive/80 p-1"
+                        title="Delete article"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
                 ))}
               </div>
             )}

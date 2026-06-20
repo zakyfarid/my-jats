@@ -1,5 +1,5 @@
 """FastAPI server for OpenJATS Editor."""
-from fastapi import FastAPI, APIRouter, HTTPException, Body
+from fastapi import FastAPI, APIRouter, HTTPException, Body, Depends, UploadFile, File
 from fastapi.responses import Response
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -19,7 +19,13 @@ from reference_text_parser import parse_references_text
 from citation_formatter import format_references
 from external_lookup import lookup_crossref, lookup_orcid
 from docx_generator import generate_docx
+from docx_parser import parse_docx_template
 from pdf_generator import generate_pdf_from_url
+from auth import (
+    User, UserPublic, LoginRequest, CreateAdminRequest,
+    hash_password, verify_password, create_token,
+    get_current_user, require_super_admin,
+)
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
@@ -36,6 +42,66 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+# ---------- Auth ----------
+@api_router.post("/auth/login")
+async def auth_login(payload: LoginRequest):
+    email = payload.email.strip().lower()
+    user = await db.users.find_one({"email": email}, {"_id": 0})
+    if not user or not verify_password(payload.password, user.get("password_hash", "")):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    token = create_token(user["id"], user["email"], user["role"])
+    public = {k: user.get(k, "") for k in ("id", "email", "name", "role", "created_at")}
+    return {"token": token, "user": public}
+
+
+@api_router.get("/auth/me", response_model=UserPublic)
+async def auth_me(user: dict = Depends(get_current_user)):
+    doc = await db.users.find_one({"id": user["id"]}, {"_id": 0, "password_hash": 0})
+    if not doc:
+        raise HTTPException(status_code=401, detail="User not found")
+    return UserPublic(**doc)
+
+
+# Admin management — super_admin only
+@api_router.get("/admins", response_model=List[UserPublic])
+async def list_admins(_: dict = Depends(require_super_admin)):
+    docs = await db.users.find({}, {"_id": 0, "password_hash": 0}).sort("created_at", -1).to_list(1000)
+    return [UserPublic(**d) for d in docs]
+
+
+@api_router.post("/admins", response_model=UserPublic)
+async def create_admin(payload: CreateAdminRequest, _: dict = Depends(require_super_admin)):
+    email = payload.email.strip().lower()
+    if not email or "@" not in email:
+        raise HTTPException(status_code=400, detail="Valid email required")
+    if len(payload.password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+    existing = await db.users.find_one({"email": email})
+    if existing:
+        raise HTTPException(status_code=400, detail="Email already exists")
+    new_user = User(
+        email=email,
+        name=payload.name or "",
+        role="admin",
+        password_hash=hash_password(payload.password),
+    )
+    await db.users.insert_one(new_user.model_dump())
+    return UserPublic(**new_user.model_dump(exclude={"password_hash"}))
+
+
+@api_router.delete("/admins/{user_id}")
+async def delete_admin(user_id: str, current: dict = Depends(require_super_admin)):
+    if user_id == current["id"]:
+        raise HTTPException(status_code=400, detail="Cannot delete yourself")
+    doc = await db.users.find_one({"id": user_id})
+    if not doc:
+        raise HTTPException(status_code=404, detail="User not found")
+    if doc.get("role") == "super_admin":
+        raise HTTPException(status_code=400, detail="Cannot delete super admin")
+    await db.users.delete_one({"id": user_id})
+    return {"deleted": True}
+
+
 # ---------- Articles ----------
 @api_router.get("/articles", response_model=List[ArticleSummary])
 async def list_articles(
@@ -44,6 +110,7 @@ async def list_articles(
     volume: Optional[str] = None,
     issue: Optional[str] = None,
     year: Optional[str] = None,
+    _: dict = Depends(get_current_user),
 ):
     query = {}
     if status:
@@ -84,7 +151,7 @@ async def list_articles(
 
 
 @api_router.post("/articles", response_model=Article)
-async def create_article(article: Article):
+async def create_article(article: Article, _: dict = Depends(get_current_user)):
     article.created_at = _now_iso()
     article.updated_at = _now_iso()
     await db.articles.insert_one(article.model_dump())
@@ -100,7 +167,7 @@ async def get_article(article_id: str):
 
 
 @api_router.put("/articles/{article_id}", response_model=Article)
-async def update_article(article_id: str, article: Article):
+async def update_article(article_id: str, article: Article, _: dict = Depends(get_current_user)):
     article.id = article_id
     article.updated_at = _now_iso()
     existing = await db.articles.find_one({"id": article_id}, {"_id": 0})
@@ -112,7 +179,7 @@ async def update_article(article_id: str, article: Article):
 
 
 @api_router.delete("/articles/{article_id}")
-async def delete_article(article_id: str):
+async def delete_article(article_id: str, _: dict = Depends(get_current_user)):
     result = await db.articles.delete_one({"id": article_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Article not found")
@@ -144,6 +211,43 @@ async def article_issue_info(article_id: str):
         "issue": j.get("issue", ""),
         "year": j.get("year", ""),
     }
+
+
+@api_router.post("/articles/upload-docx", response_model=Article)
+async def upload_docx_template(file: UploadFile = File(...), _: dict = Depends(get_current_user)):
+    """Upload a DOCX file, auto-detect title and IMRAD sections, return new article."""
+    if not file.filename or not file.filename.lower().endswith(".docx"):
+        raise HTTPException(status_code=400, detail="Only .docx files are supported")
+    data = await file.read()
+    try:
+        parsed = parse_docx_template(data)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Could not parse DOCX: {e}")
+
+    # Build a new article from parsed content
+    art = Article(
+        title=parsed.get("title", "") or "Untitled (from DOCX)",
+        keywords=parsed.get("keywords", []),
+        status="draft",
+    )
+    art.abstract.english = parsed.get("abstract", "")
+    for k, v in parsed.get("sections", {}).items():
+        if hasattr(art.sections, k):
+            setattr(art.sections, k, v or "")
+
+    # Try to parse references from the references_text
+    refs_text = parsed.get("references_text", "")
+    if refs_text:
+        try:
+            parsed_refs = parse_references_text(refs_text)
+            art.references = parsed_refs
+        except Exception:
+            pass
+
+    art.created_at = _now_iso()
+    art.updated_at = _now_iso()
+    await db.articles.insert_one(art.model_dump())
+    return art
 
 
 # ---------- Validation ----------
@@ -329,7 +433,7 @@ async def list_templates():
 
 
 @api_router.post("/templates", response_model=Template)
-async def create_template(template: Template):
+async def create_template(template: Template, _: dict = Depends(get_current_user)):
     template.created_at = _now_iso()
     await db.templates.insert_one(template.model_dump())
     return template
@@ -355,7 +459,7 @@ async def update_template(template_id: str, template: Template):
 
 
 @api_router.delete("/templates/{template_id}")
-async def delete_template(template_id: str):
+async def delete_template(template_id: str, _: dict = Depends(get_current_user)):
     result = await db.templates.delete_one({"id": template_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Template not found")
@@ -379,6 +483,24 @@ app.add_middleware(
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
+
+
+@app.on_event("startup")
+async def seed_super_admin():
+    email = (os.environ.get("SUPER_ADMIN_EMAIL") or "superadmin@openjats.local").strip().lower()
+    password = os.environ.get("SUPER_ADMIN_PASSWORD", "changeme123")
+    existing = await db.users.find_one({"email": email})
+    if not existing:
+        user = User(email=email, name="Super Admin", role="super_admin", password_hash=hash_password(password))
+        await db.users.insert_one(user.model_dump())
+        logger.info("Seeded super admin %s", email)
+    elif not verify_password(password, existing.get("password_hash", "")):
+        await db.users.update_one({"email": email}, {"$set": {"password_hash": hash_password(password)}})
+        logger.info("Updated super admin password for %s", email)
+    try:
+        await db.users.create_index("email", unique=True)
+    except Exception:
+        pass
 
 
 @app.on_event("shutdown")
