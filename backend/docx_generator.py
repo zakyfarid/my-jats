@@ -617,18 +617,13 @@ def generate_docx(article: Article, citation_style: str = "apa") -> bytes:
     font_family = article.font_family or "Times New Roman"
     T = LABELS.get(article.language) or LABELS["en"]
 
-    # Author affiliations + emails block
+    # Author affiliations (no email — only corresponding email line shown below)
     if article.authors:
         for i, a in enumerate(article.authors, 1):
-            if a.affiliation or a.email:
+            if a.affiliation:
                 af = doc.add_paragraph()
                 af.alignment = WD_ALIGN_PARAGRAPH.LEFT
-                parts = []
-                if a.affiliation:
-                    parts.append(f"{a.affiliation}{(', ' + a.country) if a.country else ''}")
-                if a.email:
-                    parts.append(a.email)
-                afr = af.add_run(f"{i}. " + " · ".join(parts))
+                afr = af.add_run(f"{i}. {a.affiliation}{(', ' + a.country) if a.country else ''}")
                 afr.italic = True
                 afr.font.size = Pt(9)
                 afr.font.name = "Times New Roman"
@@ -638,14 +633,18 @@ def generate_docx(article: Article, citation_style: str = "apa") -> bytes:
     if corresponding and corresponding.email:
         cp = doc.add_paragraph()
         cp.alignment = WD_ALIGN_PARAGRAPH.LEFT
-        cr = cp.add_run(f"* {T['corresp']}: {corresponding.email}")
-        cr.italic = True
-        cr.font.size = Pt(9)
-        cr.font.name = "Times New Roman"
+        bold_run = cp.add_run("Email: ")
+        bold_run.bold = True
+        bold_run.font.size = Pt(9)
+        bold_run.font.name = "Times New Roman"
+        email_run = cp.add_run(corresponding.email)
+        email_run.font.size = Pt(9)
+        email_run.font.name = "Times New Roman"
         cp.paragraph_format.space_after = Pt(8)
 
-    # Abstract — TWO COLUMN layout (Word table 1 row x 2 cols)
-    if article.abstract.english:
+    # Abstract — layout: two_column (default) or single
+    abstract_layout = (article.abstract_layout or "two_column").lower()
+    if article.abstract.english and abstract_layout == "two_column":
         abs_table = doc.add_table(rows=1, cols=2)
         abs_table.autofit = False
         abs_table.alignment = WD_TABLE_ALIGNMENT.CENTER
@@ -705,6 +704,48 @@ def generate_docx(article: Article, citation_style: str = "apa") -> bytes:
         _add_inline_runs(body_p, article.abstract.english, base_font=font_family, base_size=10)
 
         doc.add_paragraph().paragraph_format.space_after = Pt(2)
+
+    # Abstract — SINGLE COLUMN layout
+    elif article.abstract.english and abstract_layout == "single":
+        ah = doc.add_paragraph(style="OpenJATS H2")
+        ah_run = ah.add_run(T["abstract"].upper())
+        ah_run.font.size = Pt(10)
+        ah_run.bold = True
+        _set_paragraph_shading(ah, "F1F5F9")
+        _set_paragraph_left_border(ah, "475569", 24)
+
+        ap = doc.add_paragraph(style="OpenJATS Abstract")
+        _add_inline_runs(ap, article.abstract.english, base_font=font_family, base_size=10)
+        _set_paragraph_shading(ap, "F1F5F9")
+        _set_paragraph_left_border(ap, "475569", 24)
+
+        if article.keywords:
+            kp = doc.add_paragraph(style="OpenJATS Abstract")
+            kp.paragraph_format.first_line_indent = Cm(0)
+            kr = kp.add_run(f"{T['keywords']}: ")
+            kr.bold = True
+            kr2 = kp.add_run(", ".join(article.keywords))
+            kr2.italic = True
+            _set_paragraph_shading(kp, "F1F5F9")
+            _set_paragraph_left_border(kp, "475569", 24)
+
+        if article.received_date or article.revised_date or article.accepted_date:
+            hp = doc.add_paragraph()
+            hp.alignment = WD_ALIGN_PARAGRAPH.LEFT
+            bits = []
+            if article.received_date:
+                bits.append(f"{T['received']}: {article.received_date}")
+            if article.revised_date:
+                bits.append(f"{T['revised']}: {article.revised_date}")
+            if article.accepted_date:
+                bits.append(f"{T['accepted']}: {article.accepted_date}")
+            hr = hp.add_run(" · ".join(bits))
+            hr.italic = True
+            hr.font.size = Pt(9)
+            hr.font.name = "Calibri"
+            hp.paragraph_format.space_after = Pt(6)
+            _set_paragraph_shading(hp, "F1F5F9")
+            _set_paragraph_left_border(hp, "475569", 24)
 
     # Creative Commons License block — matches PDF "license-banner"
     lic_map = {

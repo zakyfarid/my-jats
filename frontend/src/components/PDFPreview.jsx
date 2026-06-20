@@ -367,19 +367,21 @@ export function PDFPreview({ article, formattedRefs = [], issueInfo }) {
                 <div key={`aff-${i}`}>
                   <sup>{i + 1}</sup> {a.affiliation}
                   {a.country ? `, ${a.country}` : ""}
-                  {a.email ? <span className="not-italic text-zinc-700"> · {a.email}</span> : null}
                 </div>
               ) : null
             )}
-            {(article.authors || []).find((a) => a.corresponding) && (
+            {(article.authors || []).find((a) => a.corresponding)?.email && (
               <div className="mt-1 not-italic">
-                * {T.corresp_email}: <a href={`mailto:${(article.authors || []).find((a) => a.corresponding)?.email}`} className="text-zinc-700 underline">{(article.authors || []).find((a) => a.corresponding)?.email}</a>
+                <strong>Email:</strong>{" "}
+                <a href={`mailto:${(article.authors || []).find((a) => a.corresponding)?.email}`} className="text-zinc-700 underline">
+                  {(article.authors || []).find((a) => a.corresponding)?.email}
+                </a>
               </div>
             )}
           </div>
 
-          {/* Abstract — two-column layout: left = keywords + dates, right = abstract text */}
-          {article.abstract?.english && (
+          {/* Abstract — layout: two_column (default) or single */}
+          {article.abstract?.english && (article.abstract_layout || "two_column") === "two_column" && (
             <div className="bg-zinc-50 border-l-4 border-zinc-400 p-4 mb-6 text-sm">
               <div className="grid grid-cols-12 gap-5">
                 <aside className="col-span-4 text-xs space-y-3 border-r border-zinc-200 pr-4" data-testid="pdf-abstract-sidebar">
@@ -415,6 +417,26 @@ export function PDFPreview({ article, formattedRefs = [], issueInfo }) {
                   )}
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Abstract — single column layout */}
+          {article.abstract?.english && (article.abstract_layout || "two_column") === "single" && (
+            <div className="bg-zinc-50 border-l-4 border-zinc-400 p-4 mb-6 text-sm" data-testid="pdf-abstract-single">
+              <div className="font-sans font-bold uppercase tracking-wider text-xs mb-2">{T.abstract}</div>
+              <p className="leading-relaxed pdf-abstract">{article.abstract.english}</p>
+              {article.keywords?.length > 0 && (
+                <div className="mt-3 text-xs">
+                  <strong>{T.keywords}:</strong> <span className="italic">{article.keywords.join(", ")}</span>
+                </div>
+              )}
+              {(article.received_date || article.revised_date || article.accepted_date) && (
+                <div className="mt-2 text-xs text-zinc-700">
+                  {article.received_date && (<span><strong>{T.received}:</strong> {article.received_date} </span>)}
+                  {article.revised_date && (<span> · <strong>{T.revised}:</strong> {article.revised_date} </span>)}
+                  {article.accepted_date && (<span> · <strong>{T.accepted}:</strong> {article.accepted_date}</span>)}
+                </div>
+              )}
             </div>
           )}
 

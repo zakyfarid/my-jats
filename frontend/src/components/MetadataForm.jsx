@@ -191,6 +191,12 @@ export function MetadataForm({ article, onChange, templates, onApplyTemplate }) 
             <option value="JetBrains Mono">JetBrains Mono (Monospace)</option>
           </select>
         </Field>
+        <Field label="Abstract Layout" testId="field-abstract-layout">
+          <select value={article.abstract_layout || "two_column"} onChange={(e) => set("abstract_layout", e.target.value)} className={inputCls} data-testid="input-abstract-layout">
+            <option value="two_column">Two Column — Keywords + Dates (left) · Abstract (right)</option>
+            <option value="single">Single Column — Abstract + Keywords + Dates stacked</option>
+          </select>
+        </Field>
         <Field label="Keywords (comma separated)" colSpan={2} testId="field-keywords">
           <input
             value={(article.keywords || []).join(", ")}
