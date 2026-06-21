@@ -83,3 +83,9 @@ android-sdk/archive.zip
 archive.zip
 archive
 (1).zip
+.env
+.env.*
+*.env
+credentials.json
+*.key
+.credentials
