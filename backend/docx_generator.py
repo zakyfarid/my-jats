@@ -576,6 +576,21 @@ def generate_docx(article: Article, citation_style: str = "apa") -> bytes:
     _build_page_header(doc, j, article)
     _build_page_footer(doc)
 
+    # For SINGLE layout: DOI shown ABOVE title
+    abstract_layout_pre = (article.abstract_layout or "two_column").lower()
+    if abstract_layout_pre == "single" and article.doi:
+        doi_p = doc.add_paragraph()
+        doi_p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        lbl = doi_p.add_run("DOI: ")
+        lbl.bold = True
+        lbl.font.size = Pt(10)
+        lbl.font.name = "Calibri"
+        val = doi_p.add_run(f"https://doi.org/{article.doi}")
+        val.font.size = Pt(10)
+        val.font.name = "Calibri"
+        val.font.color.rgb = RGBColor(0x03, 0x69, 0xA1)
+        doi_p.paragraph_format.space_after = Pt(6)
+
     # Title — justified (rata kiri-kanan)
     title_p = doc.add_paragraph()
     title_p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
@@ -690,6 +705,21 @@ def generate_docx(article: Article, citation_style: str = "apa") -> bytes:
                 rb = p2.add_run(f"{T['accepted']}: "); rb.bold = True; rb.font.size = Pt(9); rb.font.name = "Calibri"
                 rv = p2.add_run(article.accepted_date); rv.font.size = Pt(9); rv.font.name = "Calibri"
                 p2.paragraph_format.space_after = Pt(0)
+
+        # DOI di sidebar setelah Accepted (only for two_column layout)
+        if article.doi:
+            doi_p = left_cell.add_paragraph()
+            doi_p.paragraph_format.space_before = Pt(6)
+            doi_lbl = doi_p.add_run("DOI")
+            doi_lbl.bold = True
+            doi_lbl.font.size = Pt(8)
+            doi_lbl.font.name = "Calibri"
+            doi_p2 = left_cell.add_paragraph()
+            doi_val = doi_p2.add_run(f"https://doi.org/{article.doi}")
+            doi_val.font.size = Pt(9)
+            doi_val.font.name = "Calibri"
+            doi_val.font.color.rgb = RGBColor(0x03, 0x69, 0xA1)
+            doi_p2.paragraph_format.space_after = Pt(0)
 
         # RIGHT cell: Abstract title + body
         right_p = right_cell.paragraphs[0]
