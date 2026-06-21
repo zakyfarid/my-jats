@@ -35,6 +35,18 @@ def _suppress_hyphens(paragraph):
     pPr.append(sup)
 
 
+def _jc_both(paragraph):
+    """Force <w:jc w:val="both"/> — standard 'Justify' where the LAST line stays
+    left-aligned (never stretched). Removes any existing jc element so we override
+    style-level 'distribute' if inherited."""
+    pPr = paragraph.paragraph_format.element.get_or_add_pPr()
+    for existing in pPr.findall(qn("w:jc")):
+        pPr.remove(existing)
+    jc = OxmlElement("w:jc")
+    jc.set(qn("w:val"), "both")
+    pPr.append(jc)
+
+
 def _register_styles(doc: Document):
     """Register custom paragraph styles for body text, headings, captions."""
     styles = doc.styles
