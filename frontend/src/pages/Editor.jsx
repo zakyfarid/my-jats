@@ -62,9 +62,9 @@ export default function Editor() {
   }, [article]);
 
   // Re-format references when references list OR citation style changes
-  useEffect(() => {  if (!article) return;  api.formatReferences(article.references || [], citationStyle)
+  useEffect(() => {  if (!article) return;  const style = article.citation_style || "apa";  api.formatReferences(article.references || [], style)
     .then((d) => setFormattedRefs(d.formatted))
-    .catch(() => {});}, [article, citationStyle, referencesCount]);
+    .catch(() => {});}, [article]);
   useEffect(() => {
     if (!article) return;
     clearInterval(autosaveTimer.current);
