@@ -37,6 +37,7 @@ export default function Editor() {
   const [exportOpen, setExportOpen] = useState(false);
   const [issueInfo, setIssueInfo] = useState(null);
 
+  const citationStyle = article?.citation_style || "apa";
   const articleRef = useRef(null);
   const validationTimer = useRef(null);
   const autosaveTimer = useRef(null);
@@ -47,6 +48,7 @@ export default function Editor() {
       .then(([art, tpls, info]) => {
         if (cancelled) return;
         setArticle(art);
+        articleRef.current = art;
         setTemplates(tpls);
         setIssueInfo(info);
         setLoading(false);
@@ -72,7 +74,7 @@ export default function Editor() {
       refreshXML(tab);
     }
     if (tab === "pdf") {
-      api.formatReferences(article.references || [], "apa").then((d) => setFormattedRefs(d.formatted)).catch(() => {});
+      api.formatReferences(article.references || [], citationStyle).then((d) => setFormattedRefs(d.formatted)).catch(() => {});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [article]);
@@ -102,8 +104,9 @@ export default function Editor() {
       // Save first to ensure backend XML reflects latest
       let curr = article;
       if (dirty) {
-        curr = await api.updateArticle(id, article);
+        curr = await api.updateArticle(id, articleRef.current || article);
         setArticle(curr);
+        articleRef.current = curr;
         setDirty(false);
         setSavedAt(new Date());
       }
@@ -118,6 +121,7 @@ export default function Editor() {
   };
 
   const onChange = (next) => {
+    articleRef.current = next;
     setArticle(next);
     setDirty(true);
   };
@@ -128,6 +132,7 @@ export default function Editor() {
     try {
       const updated = await api.updateArticle(id, articleRef.current);
       setArticle(updated);
+      articleRef.current = updated;
       setDirty(false);
       setSavedAt(new Date());
       if (!silent) toast.success("Saved");
@@ -143,7 +148,7 @@ export default function Editor() {
       refreshXML(newTab);
     }
     if (newTab === "pdf" && article) {
-      api.formatReferences(article.references || [], "apa").then((d) => setFormattedRefs(d.formatted)).catch(() => {});
+      api.formatReferences(article.references || [], citationStyle).then((d) => setFormattedRefs(d.formatted)).catch(() => {});
       api.getIssueInfo(id).then(setIssueInfo).catch(() => setIssueInfo(null));
     }
   };
@@ -155,6 +160,7 @@ export default function Editor() {
       ...article,
       journal: { ...article.journal, ...tpl.journal },
     };
+    articleRef.current = merged;
     setArticle(merged);
     setDirty(true);
     toast.success(`Template "${tpl.name}" applied`);
