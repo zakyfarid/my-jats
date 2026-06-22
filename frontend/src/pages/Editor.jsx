@@ -38,29 +38,11 @@ export default function Editor() {
   const [issueInfo, setIssueInfo] = useState(null);
 
   const citationStyle = article?.citation_style || "apa";
+  const referencesCount = article?.references?.length || 0;
   const articleRef = useRef(null);
   const validationTimer = useRef(null);
   const autosaveTimer = useRef(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    Promise.all([api.getArticle(id), api.listTemplates(), api.getIssueInfo(id).catch(() => null)])
-      .then(([art, tpls, info]) => {
-        if (cancelled) return;
-        setArticle(art);
-        articleRef.current = art;
-        setTemplates(tpls);
-        setIssueInfo(info);
-        setLoading(false);
-      })
-      .catch(() => {
-        toast.error("Failed to load article");
-        navigate("/");
-      });
-    return () => { cancelled = true; };
-  }, [id, navigate]);
-
-  // Re-validate when article changes
   useEffect(() => {
     if (!article) return;
     articleRef.current = article;
@@ -80,13 +62,9 @@ export default function Editor() {
   }, [article]);
 
   // Re-format references when references list OR citation style changes
-  useEffect(() => {
-    if (!article) return;
-    const style = article.citation_style || "apa";
-    api.formatReferences(article.references || [], style)
-      .then((d) => setFormattedRefs(d.formatted))
-      .catch(() => {});
-  }, [article && article.citation_style, article && (article.references || []).length]);
+  useEffect(() => {  if (!article) return;  api.formatReferences(article.references || [], citationStyle)
+    .then((d) => setFormattedRefs(d.formatted))
+    .catch(() => {});}, [article, citationStyle, referencesCount]);
   useEffect(() => {
     if (!article) return;
     clearInterval(autosaveTimer.current);
